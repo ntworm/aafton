@@ -1,0 +1,132 @@
+{
+  "corpus": "teste_novo_reexport",
+  "description": "AAF nativo TESTE_NOVO_FINAL24, Pro Tools 26.4.1, 14/10/2026 (D13): quatro tracks committed com fades/clip gain impressos, fader0/automationOff; 12 WAV mono PCM24 e 8 slots. Referencias sonoras vêm da reimportacao desse mesmo AAF no Pro Tools; clipping de21samplesIncomingL no export24 documentado separadamente, sem garantia PTX->AAF float32. Audio fora do Git, hash obrigatorio.",
+  "files": [
+    {
+      "name": "TESTE_NOVO_FINAL24.aaf",
+      "bytes": 487424,
+      "sha256": "555214ce6f6ef52156fc7e3c53953b70410e1fae3cdedcd3578c1775f7c2b12f",
+      "format": "aaf"
+    },
+    {
+      "name": "TESTE_NOVO_cwvhMBJSqgwbXBBB.wav",
+      "bytes": 5058316,
+      "sha256": "a7ea307c97df3dbd49b7c3bef233b9bd121b3d1c8dfa698356b8267a8925f3d7",
+      "channels": 1,
+      "sample_rate": 48000,
+      "frames": 1669109,
+      "format": "pcm24",
+      "format_tag": "0x0001"
+    },
+    {
+      "name": "TESTE_NOVO_fwvhMBJSxmwbXBBB.wav",
+      "bytes": 5058316,
+      "sha256": "f8afc76f7e53b79053089e450012f61b1af12f1dff80621936afbd7fb1f3bbdf",
+      "channels": 1,
+      "sample_rate": 48000,
+      "frames": 1669109,
+      "format": "pcm24",
+      "format_tag": "0x0001"
+    },
+    {
+      "name": "TESTE_NOVO_hwvhMBJScrwbXBBB.wav",
+      "bytes": 1924028,
+      "sha256": "f26554707969dcf0a42389f0596ae6c2bb6a5ed7dc274f3e846150e5ab96cd7a",
+      "channels": 1,
+      "sample_rate": 48000,
+      "frames": 629760,
+      "format": "pcm24",
+      "format_tag": "0x0001"
+    },
+    {
+      "name": "TESTE_NOVO_pwvhMBJSmvwbXBBB.wav",
+      "bytes": 2433958,
+      "sha256": "f2c65208c6caf4f83f59e5fe1589b5ae7b41a2bbd107fd14dd37ebae13ece37e",
+      "channels": 1,
+      "sample_rate": 48000,
+      "frames": 798855,
+      "format": "pcm24",
+      "format_tag": "0x0001"
+    },
+    {
+      "name": "TESTE_NOVO_rvvhMBJSrqvbXBBB.wav",
+      "bytes": 1143344,
+      "sha256": "8074aa93e8c77aa4cf03d6c447d482a246c11ac51e03036c09e9f34c2a9bdfb8",
+      "channels": 1,
+      "sample_rate": 48000,
+      "frames": 370880,
+      "format": "pcm24",
+      "format_tag": "0x0001"
+    },
+    {
+      "name": "TESTE_NOVO_rwvhMBJSsxwbXBBB.wav",
+      "bytes": 1924028,
+      "sha256": "1e937418c906a1cec6e58cd8140c9b64100d71ee51f26e49628d703792a984b1",
+      "channels": 1,
+      "sample_rate": 48000,
+      "frames": 629760,
+      "format": "pcm24",
+      "format_tag": "0x0001"
+    },
+    {
+      "name": "TESTE_NOVO_vvvhMBJSrxvbXBBB.wav",
+      "bytes": 1655372,
+      "sha256": "666ceab609a086e13059b07d70471bf4a1a16e2e060a8d2b9f6a40501866eec6",
+      "channels": 1,
+      "sample_rate": 48000,
+      "frames": 540672,
+      "format": "pcm24",
+      "format_tag": "0x0001"
+    },
+    {
+      "name": "TESTE_NOVO_vwvhMBJSdbxbXBBB.wav",
+      "bytes": 2433958,
+      "sha256": "49647c4ea57c431b347db0460e4ac687c46c0e178d2d0d1a6ebb3cecba313316",
+      "channels": 1,
+      "sample_rate": 48000,
+      "frames": 798855,
+      "format": "pcm24",
+      "format_tag": "0x0001"
+    },
+    {
+      "name": "TESTE_NOVO_xvvhMBJSyzvbXBBB.wav",
+      "bytes": 1143344,
+      "sha256": "a7f78394cccdc94137191704c1e3134157a9d56560398acc6f34c8420793fb3d",
+      "channels": 1,
+      "sample_rate": 48000,
+      "frames": 370880,
+      "format": "pcm24",
+      "format_tag": "0x0001"
+    },
+    {
+      "name": "TESTE_NOVO_xwvhMBJShdxbXBBB.wav",
+      "bytes": 4859560,
+      "sha256": "7e189dd5ebd3ace38b46c6c4d87358a5681618978a0433727cd9830de92e588f",
+      "channels": 1,
+      "sample_rate": 48000,
+      "frames": 1603200,
+      "format": "pcm24",
+      "format_tag": "0x0001"
+    },
+    {
+      "name": "TESTE_NOVO_zvvhMBJSfdwbXBBB.wav",
+      "bytes": 1655372,
+      "sha256": "f82762ee280c4a251570be19a33b5c19a13a13a26bdb8165f6657cadefc7b8cc",
+      "channels": 1,
+      "sample_rate": 48000,
+      "frames": 540672,
+      "format": "pcm24",
+      "format_tag": "0x0001"
+    },
+    {
+      "name": "TESTE_NOVO_zwvhMBJSsgxbXBBB.wav",
+      "bytes": 4859560,
+      "sha256": "5d687c83b2e10d9bea2da7cc2d8ffd0dd61dcb5c5fa2a785fcd473a45f469903",
+      "channels": 1,
+      "sample_rate": 48000,
+      "frames": 1603200,
+      "format": "pcm24",
+      "format_tag": "0x0001"
+    }
+  ]
+}

@@ -1,0 +1,723 @@
+{
+  "provenance": "Gabriel saved generated sets using Save Live Set As on 2026-10-14. Text values are extracted unchanged from those files; no audio is included. Playback ceil at60BPM is observed in the separate diagnostic WAVs;97BPM evidence covers SaveAs normalization only.",
+  "sample_rate": 48000,
+  "inferred_ticks_per_beat": 3843840,
+  "evidence": [
+    {
+      "bpm": 60,
+      "generated_sha256": "19c5e2c37404e21a513258badbea5cebebfe6790779621f5746814368b411ce4",
+      "live_saved_sha256": "a8bee1a7b630f521196e1a178f9689dcb165266eaac46084d900238983da6f4c",
+      "creator": "Ableton Live 12.4.15b6"
+    },
+    {
+      "bpm": 97,
+      "generated_sha256": "5ba62debea4bb2ab0919e2693a2604c1a98262cc6d88027d2aa2754e19002933",
+      "live_saved_sha256": "9f7e584ab460c72cddea77f108916d9e0178828d326098786723bb0533203d58",
+      "creator": "Ableton Live 12.4.15b6"
+    }
+  ],
+  "records": [
+    {
+      "bpm": 60,
+      "track": "CONTROLE",
+      "clip": "mono",
+      "input_start": "1.0001458333333333",
+      "input_end": "2.0001458333333333",
+      "saved_start": "1.0001459478021979",
+      "saved_end": "2.0001459478021979"
+    },
+    {
+      "bpm": 60,
+      "track": "ANTECIPA_0001",
+      "clip": "mono",
+      "input_start": "1.0001458125",
+      "input_end": "2.0001458125",
+      "saved_start": "1.0001456876456876",
+      "saved_end": "2.0001456876456878"
+    },
+    {
+      "bpm": 60,
+      "track": "ANTECIPA_001",
+      "clip": "mono",
+      "input_start": "1.000145625",
+      "input_end": "2.000145625",
+      "saved_start": "1.0001456876456876",
+      "saved_end": "2.0001456876456878"
+    },
+    {
+      "bpm": 60,
+      "track": "ANTECIPA_01",
+      "clip": "mono",
+      "input_start": "1.00014375",
+      "input_end": "2.00014375",
+      "saved_start": "1.0001438665501166",
+      "saved_end": "2.0001438665501166"
+    },
+    {
+      "bpm": 60,
+      "track": "ANTECIPA_025",
+      "clip": "mono",
+      "input_start": "1.000140625",
+      "input_end": "2.000140625",
+      "saved_start": "1.0001407446719948",
+      "saved_end": "2.0001407446719948"
+    },
+    {
+      "bpm": 60,
+      "track": "ATRASA_025",
+      "clip": "mono",
+      "input_start": "1.0001510416666666",
+      "input_end": "2.000151041666667",
+      "saved_start": "1.000151150932401",
+      "saved_end": "2.000151150932401"
+    },
+    {
+      "bpm": 60,
+      "track": "CONTROLE_96013",
+      "clip": "mono",
+      "input_start": "2.0002708333333334",
+      "input_end": "3.0002708333333334",
+      "saved_start": "2.0002708229270731",
+      "saved_end": "3.0002708229270731"
+    },
+    {
+      "bpm": 60,
+      "track": "GRADE_SAVEAS",
+      "clip": "GRADE_12001",
+      "input_start": "0.2500208333333333",
+      "input_end": "0.252125",
+      "saved_start": "0.250020812520812541",
+      "saved_end": "0.252124958374958352"
+    },
+    {
+      "bpm": 60,
+      "track": "GRADE_SAVEAS",
+      "clip": "GRADE_17002",
+      "input_start": "0.35420833333333335",
+      "input_end": "0.3563125",
+      "saved_start": "0.354208291708291712",
+      "saved_end": "0.356312437562437578"
+    },
+    {
+      "bpm": 60,
+      "track": "GRADE_SAVEAS",
+      "clip": "GRADE_22003",
+      "input_start": "0.45839583333333334",
+      "input_end": "0.4605",
+      "saved_start": "0.458395770895770882",
+      "saved_end": "0.460499916749916749"
+    },
+    {
+      "bpm": 60,
+      "track": "GRADE_SAVEAS",
+      "clip": "GRADE_27004",
+      "input_start": "0.5625833333333333",
+      "input_end": "0.5646875",
+      "saved_start": "0.562583250083250053",
+      "saved_end": "0.56468739593739592"
+    },
+    {
+      "bpm": 60,
+      "track": "GRADE_SAVEAS",
+      "clip": "GRADE_32005",
+      "input_start": "0.6667708333333333",
+      "input_end": "0.668875",
+      "saved_start": "0.666770729270729223",
+      "saved_end": "0.66887487512487509"
+    },
+    {
+      "bpm": 60,
+      "track": "GRADE_SAVEAS",
+      "clip": "GRADE_37006",
+      "input_start": "0.7709583333333333",
+      "input_end": "0.7730625",
+      "saved_start": "0.770958208458208505",
+      "saved_end": "0.773062354312354261"
+    },
+    {
+      "bpm": 60,
+      "track": "GRADE_SAVEAS",
+      "clip": "GRADE_42007",
+      "input_start": "0.8751458333333333",
+      "input_end": "0.87725",
+      "saved_start": "0.875145947802197788",
+      "saved_end": "0.877250093656343655"
+    },
+    {
+      "bpm": 60,
+      "track": "GRADE_SAVEAS",
+      "clip": "GRADE_47008",
+      "input_start": "0.9793333333333333",
+      "input_end": "0.9814375",
+      "saved_start": "0.979333426989676958",
+      "saved_end": "0.981437572843822825"
+    },
+    {
+      "bpm": 60,
+      "track": "GRADE_SAVEAS",
+      "clip": "GRADE_52009",
+      "input_start": "1.0835208333333333",
+      "input_end": "1.085625",
+      "saved_start": "1.0835209061771562",
+      "saved_end": "1.085625052031302"
+    },
+    {
+      "bpm": 60,
+      "track": "GRADE_SAVEAS",
+      "clip": "GRADE_57010",
+      "input_start": "1.1877083333333334",
+      "input_end": "1.1898125",
+      "saved_start": "1.1877083853646353",
+      "saved_end": "1.1898125312187813"
+    },
+    {
+      "bpm": 60,
+      "track": "GRADE_SAVEAS",
+      "clip": "GRADE_62011",
+      "input_start": "1.2918958333333332",
+      "input_end": "1.294",
+      "saved_start": "1.2918958645521146",
+      "saved_end": "1.2940000104062603"
+    },
+    {
+      "bpm": 60,
+      "track": "GRADE_SAVEAS",
+      "clip": "GRADE_67012",
+      "input_start": "1.3960833333333333",
+      "input_end": "1.3981875",
+      "saved_start": "1.3960833437395936",
+      "saved_end": "1.3981874895937396"
+    },
+    {
+      "bpm": 60,
+      "track": "GRADE_SAVEAS",
+      "clip": "GRADE_72013",
+      "input_start": "1.5002708333333332",
+      "input_end": "1.502375",
+      "saved_start": "1.5002708229270729",
+      "saved_end": "1.5023749687812187"
+    },
+    {
+      "bpm": 60,
+      "track": "GRADE_SAVEAS",
+      "clip": "GRADE_77014",
+      "input_start": "1.6044583333333333",
+      "input_end": "1.6065625",
+      "saved_start": "1.6044583021145522",
+      "saved_end": "1.606562447968698"
+    },
+    {
+      "bpm": 60,
+      "track": "GRADE_SAVEAS",
+      "clip": "GRADE_82015",
+      "input_start": "1.7086458333333334",
+      "input_end": "1.71075",
+      "saved_start": "1.7086457813020313",
+      "saved_end": "1.7107499271561772"
+    },
+    {
+      "bpm": 60,
+      "track": "GRADE_SAVEAS",
+      "clip": "GRADE_87016",
+      "input_start": "1.8128333333333333",
+      "input_end": "1.8149375",
+      "saved_start": "1.8128332604895105",
+      "saved_end": "1.8149374063436563"
+    },
+    {
+      "bpm": 60,
+      "track": "GRADE_SAVEAS",
+      "clip": "GRADE_92017",
+      "input_start": "1.9170208333333334",
+      "input_end": "1.919125",
+      "saved_start": "1.9170207396769896",
+      "saved_end": "1.9191248855311356"
+    },
+    {
+      "bpm": 60,
+      "track": "GRADE_SAVEAS",
+      "clip": "GRADE_97018",
+      "input_start": "2.021208333333333",
+      "input_end": "2.0233125",
+      "saved_start": "2.0212082188644689",
+      "saved_end": "2.0233123647186146"
+    },
+    {
+      "bpm": 60,
+      "track": "GRADE_SAVEAS",
+      "clip": "GRADE_102019",
+      "input_start": "2.125395833333333",
+      "input_end": "2.1275",
+      "saved_start": "2.1253959582084581",
+      "saved_end": "2.1275001040626043"
+    },
+    {
+      "bpm": 60,
+      "track": "GRADE_SAVEAS",
+      "clip": "GRADE_107001",
+      "input_start": "2.2291875",
+      "input_end": "2.2312916666666665",
+      "saved_start": "2.2291874791874791",
+      "saved_end": "2.2312916250416253"
+    },
+    {
+      "bpm": 60,
+      "track": "GRADE_SAVEAS",
+      "clip": "GRADE_112002",
+      "input_start": "2.3333749999999998",
+      "input_end": "2.3354791666666666",
+      "saved_start": "2.3333749583749586",
+      "saved_end": "2.3354791042291043"
+    },
+    {
+      "bpm": 60,
+      "track": "GRADE_SAVEAS",
+      "clip": "GRADE_117003",
+      "input_start": "2.4375625",
+      "input_end": "2.4396666666666667",
+      "saved_start": "2.4375624375624376",
+      "saved_end": "2.4396665834165834"
+    },
+    {
+      "bpm": 60,
+      "track": "GRADE_SAVEAS",
+      "clip": "GRADE_122004",
+      "input_start": "2.54175",
+      "input_end": "2.5438541666666667",
+      "saved_start": "2.5417499167499167",
+      "saved_end": "2.5438540626040624"
+    },
+    {
+      "bpm": 60,
+      "track": "GRADE_SAVEAS",
+      "clip": "GRADE_127005",
+      "input_start": "2.6459375",
+      "input_end": "2.6480416666666664",
+      "saved_start": "2.6459373959373957",
+      "saved_end": "2.6480415417915419"
+    },
+    {
+      "bpm": 60,
+      "track": "GRADE_SAVEAS",
+      "clip": "GRADE_132006",
+      "input_start": "2.750125",
+      "input_end": "2.7522291666666665",
+      "saved_start": "2.7501248751248752",
+      "saved_end": "2.752229020979021"
+    },
+    {
+      "bpm": 60,
+      "track": "GRADE_SAVEAS",
+      "clip": "GRADE_137007",
+      "input_start": "2.8543125",
+      "input_end": "2.8564166666666666",
+      "saved_start": "2.8543126144688644",
+      "saved_end": "2.8564167603230102"
+    },
+    {
+      "bpm": 60,
+      "track": "GRADE_SAVEAS",
+      "clip": "GRADE_142008",
+      "input_start": "2.9585",
+      "input_end": "2.9606041666666667",
+      "saved_start": "2.9585000936563435",
+      "saved_end": "2.9606042395104897"
+    },
+    {
+      "bpm": 60,
+      "track": "GRADE_SAVEAS",
+      "clip": "GRADE_147009",
+      "input_start": "3.0626875",
+      "input_end": "3.064791666666667",
+      "saved_start": "3.062687572843823",
+      "saved_end": "3.0647917186979687"
+    },
+    {
+      "bpm": 60,
+      "track": "GRADE_SAVEAS",
+      "clip": "GRADE_152010",
+      "input_start": "3.166875",
+      "input_end": "3.1689791666666665",
+      "saved_start": "3.166875052031302",
+      "saved_end": "3.1689791978854478"
+    },
+    {
+      "bpm": 60,
+      "track": "GRADE_SAVEAS",
+      "clip": "GRADE_157011",
+      "input_start": "3.2710625",
+      "input_end": "3.2731666666666666",
+      "saved_start": "3.2710625312187811",
+      "saved_end": "3.2731666770729269"
+    },
+    {
+      "bpm": 60,
+      "track": "GRADE_SAVEAS",
+      "clip": "GRADE_162012",
+      "input_start": "3.37525",
+      "input_end": "3.377354166666666",
+      "saved_start": "3.3752500104062606",
+      "saved_end": "3.3773541562604064"
+    },
+    {
+      "bpm": 60,
+      "track": "GRADE_SAVEAS",
+      "clip": "GRADE_167013",
+      "input_start": "3.4794375",
+      "input_end": "3.4815416666666668",
+      "saved_start": "3.4794374895937397",
+      "saved_end": "3.4815416354478854"
+    },
+    {
+      "bpm": 97,
+      "track": "CONTROLE",
+      "clip": "mono",
+      "input_start": "1.6169024305555555",
+      "input_end": "3.233569097222222",
+      "saved_start": "1.6169023684648685",
+      "saved_end": "3.2335690351315352"
+    },
+    {
+      "bpm": 97,
+      "track": "ANTECIPA_0001",
+      "clip": "mono",
+      "input_start": "1.6169024305555555",
+      "input_end": "3.233569097222222",
+      "saved_start": "1.6169023684648685",
+      "saved_end": "3.2335690351315352"
+    },
+    {
+      "bpm": 97,
+      "track": "ANTECIPA_001",
+      "clip": "mono",
+      "input_start": "1.6169024305555555",
+      "input_end": "3.233569097222222",
+      "saved_start": "1.6169023684648685",
+      "saved_end": "3.2335690351315352"
+    },
+    {
+      "bpm": 97,
+      "track": "ANTECIPA_01",
+      "clip": "mono",
+      "input_start": "1.6169024305555555",
+      "input_end": "3.233569097222222",
+      "saved_start": "1.6169023684648685",
+      "saved_end": "3.2335690351315352"
+    },
+    {
+      "bpm": 97,
+      "track": "ANTECIPA_025",
+      "clip": "mono",
+      "input_start": "1.6169024305555555",
+      "input_end": "3.233569097222222",
+      "saved_start": "1.6169023684648685",
+      "saved_end": "3.2335690351315352"
+    },
+    {
+      "bpm": 97,
+      "track": "ATRASA_025",
+      "clip": "mono",
+      "input_start": "1.6169024305555555",
+      "input_end": "3.233569097222222",
+      "saved_start": "1.6169023684648685",
+      "saved_end": "3.2335690351315352"
+    },
+    {
+      "bpm": 97,
+      "track": "CONTROLE_96013",
+      "clip": "mono",
+      "input_start": "3.233771180555556",
+      "input_end": "4.8504378472222225",
+      "saved_start": "3.2337711767399266",
+      "saved_end": "4.8504378434065938"
+    },
+    {
+      "bpm": 97,
+      "track": "GRADE_SAVEAS",
+      "clip": "GRADE_12001",
+      "input_start": "0.4042003472222222",
+      "input_end": "0.4076020833333333",
+      "saved_start": "0.40420022685647683",
+      "saved_end": "0.40760203338328338"
+    },
+    {
+      "bpm": 97,
+      "track": "GRADE_SAVEAS",
+      "clip": "GRADE_17002",
+      "input_start": "0.5726368055555556",
+      "input_end": "0.5760385416666667",
+      "saved_start": "0.572636738261738221",
+      "saved_end": "0.576038544788544771"
+    },
+    {
+      "bpm": 97,
+      "track": "GRADE_SAVEAS",
+      "clip": "GRADE_22003",
+      "input_start": "0.741073263888889",
+      "input_end": "0.744475",
+      "saved_start": "0.741073249666999612",
+      "saved_end": "0.744475056193806162"
+    },
+    {
+      "bpm": 97,
+      "track": "GRADE_SAVEAS",
+      "clip": "GRADE_27004",
+      "input_start": "0.9095097222222222",
+      "input_end": "0.9129114583333333",
+      "saved_start": "0.909509761072261114",
+      "saved_end": "0.912911567599067553"
+    },
+    {
+      "bpm": 97,
+      "track": "GRADE_SAVEAS",
+      "clip": "GRADE_32005",
+      "input_start": "1.0779461805555557",
+      "input_end": "1.0813479166666666",
+      "saved_start": "1.0779462724775224",
+      "saved_end": "1.0813480790043291"
+    },
+    {
+      "bpm": 97,
+      "track": "GRADE_SAVEAS",
+      "clip": "GRADE_37006",
+      "input_start": "1.2463826388888888",
+      "input_end": "1.249784375",
+      "saved_start": "1.2463825237262738",
+      "saved_end": "1.2497843302530802"
+    },
+    {
+      "bpm": 97,
+      "track": "GRADE_SAVEAS",
+      "clip": "GRADE_42007",
+      "input_start": "1.4148190972222223",
+      "input_end": "1.4182208333333333",
+      "saved_start": "1.4148190351315351",
+      "saved_end": "1.4182208416583417"
+    },
+    {
+      "bpm": 97,
+      "track": "GRADE_SAVEAS",
+      "clip": "GRADE_47008",
+      "input_start": "1.5832555555555556",
+      "input_end": "1.5866572916666668",
+      "saved_start": "1.5832555465367966",
+      "saved_end": "1.586657353063603"
+    },
+    {
+      "bpm": 97,
+      "track": "GRADE_SAVEAS",
+      "clip": "GRADE_52009",
+      "input_start": "1.7516920138888887",
+      "input_end": "1.7550937500000001",
+      "saved_start": "1.7516920579420578",
+      "saved_end": "1.7550938644688645"
+    },
+    {
+      "bpm": 97,
+      "track": "GRADE_SAVEAS",
+      "clip": "GRADE_57010",
+      "input_start": "1.9201284722222223",
+      "input_end": "1.9235302083333332",
+      "saved_start": "1.9201285693473193",
+      "saved_end": "1.9235303758741258"
+    },
+    {
+      "bpm": 97,
+      "track": "GRADE_SAVEAS",
+      "clip": "GRADE_62011",
+      "input_start": "2.088564930555555",
+      "input_end": "2.0919666666666665",
+      "saved_start": "2.0885648205960705",
+      "saved_end": "2.091966627122877"
+    },
+    {
+      "bpm": 97,
+      "track": "GRADE_SAVEAS",
+      "clip": "GRADE_67012",
+      "input_start": "2.257001388888889",
+      "input_end": "2.260403125",
+      "saved_start": "2.257001332001332",
+      "saved_end": "2.2604031385281385"
+    },
+    {
+      "bpm": 97,
+      "track": "GRADE_SAVEAS",
+      "clip": "GRADE_72013",
+      "input_start": "2.425437847222222",
+      "input_end": "2.4288395833333336",
+      "saved_start": "2.4254378434065935",
+      "saved_end": "2.4288396499334"
+    },
+    {
+      "bpm": 97,
+      "track": "GRADE_SAVEAS",
+      "clip": "GRADE_77014",
+      "input_start": "2.5938743055555555",
+      "input_end": "2.5972760416666665",
+      "saved_start": "2.593874354811855",
+      "saved_end": "2.5972761613386615"
+    },
+    {
+      "bpm": 97,
+      "track": "GRADE_SAVEAS",
+      "clip": "GRADE_82015",
+      "input_start": "2.762310763888889",
+      "input_end": "2.7657125",
+      "saved_start": "2.7623108662171161",
+      "saved_end": "2.765712672743923"
+    },
+    {
+      "bpm": 97,
+      "track": "GRADE_SAVEAS",
+      "clip": "GRADE_87016",
+      "input_start": "2.930747222222222",
+      "input_end": "2.934148958333333",
+      "saved_start": "2.9307471174658675",
+      "saved_end": "2.9341489239926739"
+    },
+    {
+      "bpm": 97,
+      "track": "GRADE_SAVEAS",
+      "clip": "GRADE_92017",
+      "input_start": "3.0991836805555555",
+      "input_end": "3.1025854166666664",
+      "saved_start": "3.099183628871129",
+      "saved_end": "3.1025854353979354"
+    },
+    {
+      "bpm": 97,
+      "track": "GRADE_SAVEAS",
+      "clip": "GRADE_97018",
+      "input_start": "3.2676201388888884",
+      "input_end": "3.2710218749999997",
+      "saved_start": "3.2676201402763905",
+      "saved_end": "3.2710219468031969"
+    },
+    {
+      "bpm": 97,
+      "track": "GRADE_SAVEAS",
+      "clip": "GRADE_102019",
+      "input_start": "3.4360565972222217",
+      "input_end": "3.439458333333333",
+      "saved_start": "3.4360566516816515",
+      "saved_end": "3.4394584582084584"
+    },
+    {
+      "bpm": 97,
+      "track": "GRADE_SAVEAS",
+      "clip": "GRADE_107001",
+      "input_start": "3.603853125",
+      "input_end": "3.6072548611111106",
+      "saved_start": "3.6038531780719283",
+      "saved_end": "3.6072549845987347"
+    },
+    {
+      "bpm": 97,
+      "track": "GRADE_SAVEAS",
+      "clip": "GRADE_112002",
+      "input_start": "3.772289583333333",
+      "input_end": "3.7756913194444444",
+      "saved_start": "3.7722896894771893",
+      "saved_end": "3.7756914960039958"
+    },
+    {
+      "bpm": 97,
+      "track": "GRADE_SAVEAS",
+      "clip": "GRADE_117003",
+      "input_start": "3.9407260416666663",
+      "input_end": "3.9441277777777777",
+      "saved_start": "3.9407259407259407",
+      "saved_end": "3.9441277472527472"
+    },
+    {
+      "bpm": 97,
+      "track": "GRADE_SAVEAS",
+      "clip": "GRADE_122004",
+      "input_start": "4.109162499999999",
+      "input_end": "4.112564236111111",
+      "saved_start": "4.1091624521312022",
+      "saved_end": "4.1125642586580087"
+    },
+    {
+      "bpm": 97,
+      "track": "GRADE_SAVEAS",
+      "clip": "GRADE_127005",
+      "input_start": "4.277598958333333",
+      "input_end": "4.281000694444444",
+      "saved_start": "4.2775989635364633",
+      "saved_end": "4.2810007700632697"
+    },
+    {
+      "bpm": 97,
+      "track": "GRADE_SAVEAS",
+      "clip": "GRADE_132006",
+      "input_start": "4.446035416666667",
+      "input_end": "4.449437152777778",
+      "saved_start": "4.4460354749417252",
+      "saved_end": "4.4494372814685317"
+    },
+    {
+      "bpm": 97,
+      "track": "GRADE_SAVEAS",
+      "clip": "GRADE_137007",
+      "input_start": "4.614471875",
+      "input_end": "4.6178736111111105",
+      "saved_start": "4.6144719863469863",
+      "saved_end": "4.6178737928737927"
+    },
+    {
+      "bpm": 97,
+      "track": "GRADE_SAVEAS",
+      "clip": "GRADE_142008",
+      "input_start": "4.782908333333333",
+      "input_end": "4.786310069444444",
+      "saved_start": "4.7829082375957377",
+      "saved_end": "4.7863100441225441"
+    },
+    {
+      "bpm": 97,
+      "track": "GRADE_SAVEAS",
+      "clip": "GRADE_147009",
+      "input_start": "4.951344791666667",
+      "input_end": "4.954746527777777",
+      "saved_start": "4.9513447490009987",
+      "saved_end": "4.9547465555278052"
+    },
+    {
+      "bpm": 97,
+      "track": "GRADE_SAVEAS",
+      "clip": "GRADE_152010",
+      "input_start": "5.11978125",
+      "input_end": "5.123182986111111",
+      "saved_start": "5.1197812604062607",
+      "saved_end": "5.1231830669330671"
+    },
+    {
+      "bpm": 97,
+      "track": "GRADE_SAVEAS",
+      "clip": "GRADE_157011",
+      "input_start": "5.288217708333334",
+      "input_end": "5.291619444444445",
+      "saved_start": "5.2882177718115218",
+      "saved_end": "5.2916195783383282"
+    },
+    {
+      "bpm": 97,
+      "track": "GRADE_SAVEAS",
+      "clip": "GRADE_162012",
+      "input_start": "5.456654166666667",
+      "input_end": "5.4600559027777775",
+      "saved_start": "5.4566542832167828",
+      "saved_end": "5.4600560897435901"
+    },
+    {
+      "bpm": 97,
+      "track": "GRADE_SAVEAS",
+      "clip": "GRADE_167013",
+      "input_start": "5.6250906249999995",
+      "input_end": "5.628492361111111",
+      "saved_start": "5.6250905344655342",
+      "saved_end": "5.6284923409923406"
+    }
+  ]
+}

@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>aafton | Timecode Clock</title>
+<style>
+  :root {
+    --bg-dark: #18191a;
+    --bg-panel: #242526;
+    --bg-card: #202123;
+    --bg-input: #151617;
+    --border: #383a3c;
+    --border-subtle: #2d2e30;
+    --text-primary: #f0f2f5;
+    --text-secondary: #a0a4a8;
+    --accent-orange: #ff764d;
+    --accent-cyan: #00d2c4;
+    --accent-yellow: #ffd13b;
+    --accent-green: #31a24c;
+    --accent-red: #e41e3f;
+    --mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 24px;
+    min-height: 100vh;
+    background: var(--bg-dark);
+    color: var(--text-primary);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  header {
+    display: flex;
+    align-items: baseline;
+    gap: 16px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 20px;
+  }
+  .logo-box {
+    padding: 4px 10px;
+    border-radius: 6px;
+    background: var(--accent-orange);
+    color: #1b1c1d;
+    font-weight: 700;
+    letter-spacing: 1px;
+  }
+  h1 { font-size: 20px; margin: 0; font-weight: 600; }
+  header span { color: var(--text-secondary); font-size: 13px; }
+  .painel {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px 20px;
+    margin-bottom: 16px;
+  }
+  .painel h2 {
+    margin: 0 0 12px 0;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 1.2px;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+  }
+  #tc-clock {
+    font-family: var(--mono);
+    font-size: 76px;
+    line-height: 1.05;
+    font-weight: 600;
+    letter-spacing: 2px;
+    color: var(--accent-cyan);
+    text-shadow: 0 0 24px rgba(0, 210, 196, 0.25);
+    text-align: center;
+  }
+  #tc-status {
+    margin-top: 10px;
+    text-align: center;
+    font-size: 13px;
+    color: var(--text-secondary);
+    min-height: 18px;
+    word-break: break-word;
+  }
+  #tc-status.erro { color: var(--accent-red); }
+  #tc-status.aviso { color: var(--accent-yellow); }
+  .linha {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+  }
+  .linha:last-child { margin-bottom: 0; }
+  label {
+    min-width: 190px;
+    font-size: 13px;
+    color: var(--text-secondary);
+  }
+  input[type="text"] {
+    flex: 1 1 260px;
+    min-width: 200px;
+    padding: 9px 11px;
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text-primary);
+    font-family: var(--mono);
+    font-size: 14px;
+  }
+  input[type="text"]:focus {
+    outline: none;
+    border-color: var(--accent-cyan);
+  }
+  button {
+    padding: 9px 16px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--bg-panel);
+    color: var(--text-primary);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  button:hover { border-color: var(--accent-orange); color: var(--accent-orange); }
+  button:active { transform: translateY(1px); }
+  #tc-video {
+    display: block;
+    width: 100%;
+    max-width: 720px;
+    background: #000;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+  }
+  .dica { font-size: 12px; color: var(--text-secondary); margin-top: 10px; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo-box">AAFTON</div>
+  <h1>Timecode Clock</h1>
+  <span>Live position in real time</span>
+</header>
+
+<section class="painel">
+  <h2>Clock</h2>
+  <div id="tc-clock">--:--:--:--</div>
+  <div id="tc-status">Waiting for Live...</div>
+</section>
+
+<section class="painel">
+  <h2>Set</h2>
+  <div class="linha">
+    <label for="tc-load">Set file (.als)</label>
+    <input type="text" id="tc-load" placeholder="C:\...\my-set.als" autocomplete="off">
+    <button id="tc-load-btn">Load</button>
+  </div>
+  <p class="dica">The sidecar with the anchor must sit next to the .als.</p>
+</section>
+
+<section class="painel">
+  <h2>Origin</h2>
+  <div class="linha">
+    <label for="tc-origin">Timecode at beat zero</label>
+    <input type="text" id="tc-origin" placeholder="01:00:00:00" autocomplete="off">
+    <button id="tc-origin-apply">Apply</button>
+    <button id="tc-origin-reset">Reset</button>
+  </div>
+  <p class="dica">Apply changes the origin in memory only; Reset goes back to the origin of the sidecar.</p>
+</section>
+
+<section class="painel">
+  <h2>Position</h2>
+  <div class="linha">
+    <label for="tc-goto">Go to timecode</label>
+    <input type="text" id="tc-goto" placeholder="01:00:10:00" autocomplete="off">
+    <button id="tc-goto-btn">Go</button>
+  </div>
+  <p class="dica">The Go button also works with Enter inside the field.</p>
+</section>
+
+<section class="painel">
+  <h2>Video</h2>
+  <video id="tc-video" muted playsinline></video>
+</section>
+
+<script>
+(function () {
+  "use strict";
+
+  var INTERVALO_MS = 50;
+  var RELOGIO_VAZIO = "--:--:--:--";
+  // Deriva maxima do video tolerada com o Live tocando: ele responde a cada ~100 ms.
+  var QUADROS_TOCANDO = 4;
+  // Deriva maxima do video tolerada com o Live parado: um quadro.
+  var QUADROS_PARADO = 1;
+
+  var clock = document.getElementById("tc-clock");
+  var status = document.getElementById("tc-status");
+  var origem = document.getElementById("tc-origin");
+  var gotoCampo = document.getElementById("tc-goto");
+  var video = document.getElementById("tc-video");
+  var srcDefinida = false;
+
+  function post(caminho, corpo) {
+    return fetch(caminho, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(corpo)
+    }).then(function (resposta) {
+      return resposta.json().catch(function () {
+        return { ok: false, error: "invalid answer from the Studio" };
+      });
+    });
+  }
+
+  // O Studio manda a taxa como 25, 29.97 ou NUM/DEN: a pagina precisa do
+  // numero real de quadros por segundo em qualquer caso.
+  function fpsDaTaxa(texto) {
+    var partes = String(texto || "").split("/");
+    var num = parseFloat(partes[0]);
+    var den = partes.length > 1 ? parseFloat(partes[1]) : 1;
+    if (!den || isNaN(den)) {
+      den = 1;
+    }
+    if (!num || isNaN(num) || num <= 0) {
+      return 25;
+    }
+    return num / den;
+  }
+
+  function taxaDeQuadros(estado) {
+    return fpsDaTaxa(estado.rate);
+  }
+
+  function sincronizarVideo(estado) {
+    var info = estado.video;
+    if (!info) {
+      if (video.getAttribute("src")) {
+        video.removeAttribute("src");
+        video.load();
+        srcDefinida = false;
+      }
+      return;
+    }
+    if (!srcDefinida) {
+      srcDefinida = true;
+      video.src = info.url;
+      video.load();
+    }
+    if (estado.beats === null || estado.bpm === null || !estado.bpm) {
+      return;
+    }
+    var alvo = estado.beats * 60 / estado.bpm - info.start_seconds + info.source_offset_seconds;
+    if (alvo < 0) {
+      alvo = 0;
+    }
+    var quadro = 1 / taxaDeQuadros(estado);
+    var desvio = Math.abs(video.currentTime - alvo);
+    var limite = (estado.playing ? QUADROS_TOCANDO : QUADROS_PARADO) * quadro;
+    if (estado.playing) {
+      if (video.paused) {
+        var promessa = video.play();
+        if (promessa && promessa.catch) {
+          promessa.catch(function () {});
+        }
+      }
+    } else {
+      video.pause();
+    }
+    if (desvio > limite) {
+      video.currentTime = alvo;
+    }
+  }
+
+  function mostrarStatus(estado) {
+    var partes = [];
+    if (estado.connected) {
+      partes.push(estado.playing ? "Live connected, playing" : "Live connected, stopped");
+    } else {
+      partes.push("Live not answering");
+    }
+    if (estado.error) {
+      partes.push(estado.error);
+    }
+    if (estado.tempo_warning) {
+      partes.push(estado.tempo_warning);
+    }
+    status.textContent = partes.join(" | ");
+    if (estado.error) {
+      status.className = "erro";
+    } else if (estado.tempo_warning) {
+      status.className = "aviso";
+    } else {
+      status.className = "";
+    }
+  }
+
+  function aplicar(estado) {
+    clock.textContent = estado.label || RELOGIO_VAZIO;
+    if (document.activeElement !== origem && estado.origin_label) {
+      origem.value = estado.origin_label;
+    }
+    mostrarStatus(estado);
+    sincronizarVideo(estado);
+  }
+
+  function consultar() {
+    return fetch("/api/timecode/state", { headers: { "Accept": "application/json" } })
+      .then(function (resposta) {
+        return resposta.json().then(function (dados) {
+          return { ok: resposta.ok, dados: dados };
+        });
+      })
+      .then(function (resultado) {
+        if (!resultado.ok) {
+          clock.textContent = RELOGIO_VAZIO;
+          status.textContent = resultado.dados.error || "no set loaded";
+          status.className = "erro";
+          return;
+        }
+        aplicar(resultado.dados);
+      })
+      .catch(function (erro) {
+        clock.textContent = RELOGIO_VAZIO;
+        status.textContent = "Studio not answering: " + erro.message;
+        status.className = "erro";
+      })
+      .then(function () {
+        setTimeout(consultar, INTERVALO_MS);
+      });
+  }
+
+  function respostaDoStudio(dados) {
+    if (dados && dados.ok) {
+      aplicar(dados);
+      return;
+    }
+    status.textContent = (dados && dados.error) || "the Studio refused the request";
+    status.className = "erro";
+  }
+
+  function respostaDoGoto(dados) {
+    if (dados && dados.ok) {
+      // O goto nao devolve o estado do Live: so limpa o erro, a consulta repinta.
+      if (status.className === "erro") {
+        status.textContent = "";
+        status.className = "";
+      }
+      return;
+    }
+    status.textContent = (dados && dados.error) || "the Studio refused the request";
+    status.className = "erro";
+  }
+
+  document.getElementById("tc-load-btn").addEventListener("click", function () {
+    var caminho = document.getElementById("tc-load").value.trim();
+    if (!caminho) {
+      return;
+    }
+    post("/api/timecode/load", { als: caminho }).then(function (dados) {
+      if (dados && dados.ok) {
+        srcDefinida = false;
+      }
+      respostaDoStudio(dados);
+    });
+  });
+
+  document.getElementById("tc-origin-apply").addEventListener("click", function () {
+    post("/api/timecode/start", { label: origem.value.trim() }).then(respostaDoStudio);
+  });
+
+  document.getElementById("tc-origin-reset").addEventListener("click", function () {
+    post("/api/timecode/start", { label: null }).then(respostaDoStudio);
+  });
+
+  document.getElementById("tc-goto-btn").addEventListener("click", function () {
+    post("/api/timecode/goto", { label: gotoCampo.value.trim() }).then(respostaDoGoto);
+  });
+
+  gotoCampo.addEventListener("keydown", function (evento) {
+    if (evento.key === "Enter") {
+      evento.preventDefault();
+      document.getElementById("tc-goto-btn").click();
+    }
+  });
+
+  consultar();
+})();
+</script>
+</body>
+</html>

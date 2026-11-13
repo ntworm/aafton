@@ -1,0 +1,55 @@
+{
+  "source": "Pro Tools 26.4.1, TESTE_NOVO_MC.aaf; export multicanal MC, 13/10/2026",
+  "source_sha256": "08b136887049c2af6e9cc0b78b515750320e78796654cc85064c891a7fa1f83d",
+  "slot_attributes": {
+    "_TRACK_FORMAT": 2
+  },
+  "component_attributes": {
+    "_IGNORE_TRACKING": 0
+  },
+  "operation_auid": "6b46dd7a-132d-4856-ab21-8b751d8462ec",
+  "operation_properties": {
+    "NumberInputs": 1,
+    "Bypass": 0,
+    "IsTimeWarp": false,
+    "OperationCategory": "OperationCategory_Effect"
+  },
+  "parameters": {
+    "AvidParameterByteOrder": 18761,
+    "AvidEffectID": [
+      69,
+      70,
+      70,
+      50,
+      95,
+      65,
+      85,
+      68,
+      73,
+      79,
+      95,
+      67,
+      72,
+      65,
+      78,
+      78,
+      69,
+      76,
+      95,
+      67,
+      79,
+      77,
+      66,
+      73,
+      78,
+      69,
+      82,
+      0
+    ]
+  },
+  "master_segment_type": "SourceClip",
+  "source_segment_type": "SourceClip",
+  "source_channels": 1,
+  "distinct_masters": true,
+  "distinct_sources": true
+}

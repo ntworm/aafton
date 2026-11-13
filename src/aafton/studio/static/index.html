@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>aafton</title>
+<style>
+/*__STUDIO_CSS__*/
+</style>
+</head>
+<body>
+
+<header class="bar">
+  <div class="mark" aria-label="aafton"><span class="mark-a">aaf</span><span class="mark-b">ton</span></div>
+  <div class="dir" role="tablist" aria-label="Direction">
+    <button class="dir-tab" type="button" role="tab" id="tab-to-live" aria-controls="panel-to-live" aria-selected="true">AAF<span class="arrow" aria-hidden="true">&rarr;</span><span class="sr">to</span>Live</button>
+    <button class="dir-tab" type="button" role="tab" id="tab-to-aaf" aria-controls="panel-to-aaf" aria-selected="false" tabindex="-1">Live<span class="arrow" aria-hidden="true">&rarr;</span><span class="sr">to</span>AAF</button>
+  </div>
+  <div class="bar-meta">v<span data-f="version"></span></div>
+</header>
+
+<main>
+
+<!-- ===================== AAF to Live ===================== -->
+<section class="panel" id="panel-to-live" role="tabpanel" aria-labelledby="tab-to-live" data-direction="to_live" data-phase="empty">
+  <div class="col-main">
+  <fieldset class="set">
+
+    <div class="step">
+      <div class="step-n" aria-hidden="true">01</div>
+      <div class="step-c">
+        <div class="step-h"><h2>Source</h2><p class="hint">The session sent by the picture editor.</p></div>
+        <div class="pick">
+          <input class="path" type="text" data-f="input" spellcheck="false" autocomplete="off" placeholder="Path to the .aaf file" aria-label="Source file">
+          <button class="btn" type="button" data-act="browse-input">Choose file&hellip;</button>
+        </div>
+        <div class="opts opts-inline" data-f="edl-rate-wrap" hidden>
+          <div class="opt" role="radiogroup" aria-labelledby="a-k-edl">
+            <span class="opt-k" id="a-k-edl">Frame rate</span>
+            <div class="segs">
+              <label class="seg"><input type="radio" name="a-edl-rate" value="23.976"><span>23.976</span></label>
+              <label class="seg"><input type="radio" name="a-edl-rate" value="24"><span>24</span></label>
+              <label class="seg"><input type="radio" name="a-edl-rate" value="25"><span>25</span></label>
+              <label class="seg"><input type="radio" name="a-edl-rate" value="29.97"><span>29.97</span></label>
+              <label class="seg"><input type="radio" name="a-edl-rate" value="29.97df"><span>29.97 DF</span></label>
+              <label class="seg"><input type="radio" name="a-edl-rate" value="30"><span>30</span></label>
+            </div>
+          </div>
+          <p class="placeholder" data-f="edl-hint">Choose the frame rate of the EDL to read it.</p>
+        </div>
+        <p class="placeholder" data-when="empty">AAF, EDL (CMX 3600), Final Cut Pro 7 XML or FCPXML.</p>
+        <div class="working" data-when="reading" role="status"><span class="working-bar"></span><span class="working-text">Reading the session&hellip;</span></div>
+        <p class="msg msg-error" data-when="error" data-f="read-error" role="alert"></p>
+        <dl class="facts" data-when="ready working done" data-f="facts"></dl>
+        <div class="msg msg-warn" data-f="media-missing" hidden>
+          <span data-f="media-missing-text"></span>
+          <div class="pick pick-sub">
+            <input class="path" type="text" data-f="audio_dir" spellcheck="false" autocomplete="off" placeholder="Folder that holds the audio files" aria-label="Media folder">
+            <button class="btn" type="button" data-act="browse-audio-dir">Choose folder&hellip;</button>
+            <button class="btn" type="button" data-act="reread">Read again</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-n" aria-hidden="true">02</div>
+      <div class="step-c">
+        <div class="step-h"><h2>Tracks</h2><p class="hint">What the session holds and how each track converts.</p></div>
+        <p class="placeholder" data-when="empty reading error">Tracks appear here once a file is read.</p>
+        <table class="sheet" data-when="ready working done" data-f="tracks">
+          <thead><tr>
+            <th class="c-n" scope="col">#</th>
+            <th class="c-name" scope="col">Track</th>
+            <th class="c-kind" scope="col">Channels</th>
+            <th class="c-clips" scope="col">Clips</th>
+            <th class="c-lane" scope="col"><div class="ruler" aria-label="Timeline"><span data-f="tc-start"></span><span data-f="tc-end"></span></div></th>
+            <th class="c-state" scope="col">State</th>
+          </tr></thead>
+          <tbody data-f="track-rows"></tbody>
+        </table>
+        <div data-when="ready working done" data-f="notes-block" hidden>
+          <h3 class="notes-h">Notes</h3>
+          <ul class="notes" data-f="notes"></ul>
+          <details class="notes-more" data-f="notes-info-wrap" hidden>
+            <summary><span data-f="notes-info-count"></span></summary>
+            <ul class="notes" data-f="notes-info"></ul>
+          </details>
+        </div>
+      </div>
+    </div>
+
+  </fieldset>
+  </div>
+  <aside class="col-side">
+    <div class="step">
+      <div class="step-n" aria-hidden="true">03</div>
+      <div class="step-c">
+        <div class="step-h"><h2>Live set</h2></div>
+        <fieldset class="set">
+        <div class="field">
+          <label for="a-output">Destination</label>
+          <div class="field-row">
+            <input class="path" type="text" id="a-output" data-f="output" spellcheck="false" autocomplete="off" placeholder="Set after reading">
+            <button class="btn" type="button" data-act="browse-output">Save as&hellip;</button>
+          </div>
+        </div>
+
+        <div class="opts">
+          <div class="opt" role="radiogroup" aria-labelledby="a-k-stereo">
+            <span class="opt-k" id="a-k-stereo">Stereo</span>
+            <div class="segs">
+              <label class="seg"><input type="radio" name="a-stereo" value="pair" checked><span>Pair L/R</span></label>
+              <label class="seg"><input type="radio" name="a-stereo" value="split"><span>Keep mono</span></label>
+            </div>
+          </div>
+          <div class="opt" role="radiogroup" aria-labelledby="a-k-fades">
+            <span class="opt-k" id="a-k-fades">Fades</span>
+            <div class="segs">
+              <label class="seg"><input type="radio" name="a-fades" value="absorb" checked><span>Native</span></label>
+              <label class="seg"><input type="radio" name="a-fades" value="keep"><span>Keep rendered</span></label>
+            </div>
+          </div>
+          <div class="opt" role="radiogroup" aria-labelledby="a-k-groups">
+            <span class="opt-k" id="a-k-groups">Groups</span>
+            <div class="segs">
+              <label class="seg"><input type="radio" name="a-groups" value="none" checked><span>Off</span></label>
+              <label class="seg"><input type="radio" name="a-groups" value="prefix"><span>By name prefix</span></label>
+            </div>
+          </div>
+        </div>
+
+        <details class="more">
+          <summary>More options</summary>
+          <div class="more-body">
+            <div class="field">
+              <label for="a-template">Live template</label>
+              <div class="field-row">
+                <input class="path" type="text" id="a-template" data-f="template" spellcheck="false" autocomplete="off" placeholder="Built-in template">
+                <button class="btn" type="button" data-act="browse-template">Choose&hellip;</button>
+              </div>
+            </div>
+            <div class="field">
+              <label for="a-bpm">Tempo (BPM)</label>
+              <input class="path" type="text" inputmode="decimal" id="a-bpm" data-f="bpm" value="60">
+            </div>
+            <div class="field">
+              <label for="a-origin">Timecode at beat zero</label>
+              <input class="path" type="text" id="a-origin" data-f="live_origin" spellcheck="false" autocomplete="off" placeholder="Automatic">
+            </div>
+            <div class="field">
+              <label for="a-video">Picture</label>
+              <div class="field-row">
+                <input class="path" type="text" id="a-video" data-f="video" spellcheck="false" autocomplete="off" placeholder="Auto-detect">
+                <button class="btn" type="button" data-act="browse-video">Choose&hellip;</button>
+              </div>
+            </div>
+            <div class="field">
+              <label for="a-video-start">Picture start timecode</label>
+              <input class="path" type="text" id="a-video-start" data-f="video_start" spellcheck="false" autocomplete="off" placeholder="Automatic">
+            </div>
+            <div class="field">
+              <label for="a-session-text">Pro Tools session text</label>
+              <div class="field-row">
+                <input class="path" type="text" id="a-session-text" data-f="session_text" spellcheck="false" autocomplete="off" placeholder="Auto-detect">
+                <button class="btn" type="button" data-act="browse-session-text">Choose&hellip;</button>
+              </div>
+            </div>
+            <label class="check"><input type="checkbox" data-f="ltc"><span>Add an LTC track</span></label>
+            <div class="opts">
+              <div class="opt" role="radiogroup" aria-labelledby="a-k-mode">
+                <span class="opt-k" id="a-k-mode">Mode</span>
+                <div class="segs">
+                  <label class="seg"><input type="radio" name="a-mode" value="strict" checked><span>Strict</span></label>
+                  <label class="seg"><input type="radio" name="a-mode" value="permissive"><span>Permissive</span></label>
+                </div>
+              </div>
+            </div>
+            <p class="placeholder">Strict stops when something cannot be carried. Permissive writes the set and lists what was lost.</p>
+          </div>
+        </details>
+        </fieldset>
+
+        <div class="go">
+          <button class="btn btn-primary" type="button" data-act="convert" disabled>Convert</button>
+          <div class="working" data-when="working" role="status"><span class="working-bar"></span><span class="working-text">Converting&hellip;</span></div>
+          <p class="msg msg-error" data-f="convert-error" role="alert" hidden></p>
+          <div class="msg msg-warn" data-f="exists" hidden>
+            <span>This file already exists. Writing again replaces it.</span>
+            <div class="msg-a">
+              <button class="btn" type="button" data-act="convert-replace">Replace</button>
+              <button class="btn btn-quiet" type="button" data-act="cancel-replace">Cancel</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="verdict" data-when="done" data-f="verdict" data-state="ok" role="status" aria-live="polite">
+          <div class="verdict-k">Verification</div>
+          <div class="verdict-w" data-f="verdict-word"></div>
+          <div class="verdict-d" data-f="verdict-detail"></div>
+          <div class="verdict-a">
+            <button class="btn" type="button" data-act="open-output">Open in Live</button>
+            <button class="btn" type="button" data-act="reveal-output">Show in folder</button>
+            <button class="btn" type="button" data-act="save-report">Save report&hellip;</button>
+            <button class="btn" type="button" data-act="convert-permissive" hidden>Write anyway</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </aside>
+</section>
+
+<!-- ===================== Live to AAF ===================== -->
+<section class="panel" id="panel-to-aaf" role="tabpanel" aria-labelledby="tab-to-aaf" data-direction="to_aaf" data-phase="empty" hidden>
+  <div class="col-main">
+  <fieldset class="set">
+
+    <div class="step">
+      <div class="step-n" aria-hidden="true">01</div>
+      <div class="step-c">
+        <div class="step-h"><h2>Live set</h2><p class="hint">The set that goes back to the picture editor.</p></div>
+        <div class="pick">
+          <input class="path" type="text" data-f="input" spellcheck="false" autocomplete="off" placeholder="Path to the .als file" aria-label="Live set">
+          <button class="btn" type="button" data-act="browse-input">Choose file&hellip;</button>
+        </div>
+        <p class="placeholder" data-when="empty">An Ableton Live 12 set (.als).</p>
+        <div class="working" data-when="reading" role="status"><span class="working-bar"></span><span class="working-text">Reading the set&hellip;</span></div>
+        <p class="msg msg-error" data-when="error" data-f="read-error" role="alert"></p>
+        <dl class="facts" data-when="ready working done" data-f="facts"></dl>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-n" aria-hidden="true">02</div>
+      <div class="step-c">
+        <div class="step-h"><h2>Tracks</h2><p class="hint">Each selected track becomes one track in the AAF.</p></div>
+        <p class="placeholder" data-when="empty reading error">Tracks appear here once a set is read.</p>
+        <table class="sheet" data-when="ready working done" data-f="tracks">
+          <thead><tr>
+            <th class="c-pick" scope="col"><input type="checkbox" data-f="pick-all" aria-label="Include all ready tracks"></th>
+            <th class="c-n" scope="col">#</th>
+            <th class="c-name" scope="col">Track</th>
+            <th class="c-kind" scope="col">Type</th>
+            <th class="c-clips" scope="col">Clips</th>
+            <th class="c-lane" scope="col"><div class="ruler" aria-label="Timeline"><span data-f="tc-start"></span><span data-f="tc-end"></span></div></th>
+            <th class="c-state" scope="col">Readiness</th>
+          </tr></thead>
+          <tbody data-f="track-rows"></tbody>
+        </table>
+        <div class="sheet-foot" data-when="ready working done"><span data-f="tracks-summary"></span></div>
+        <div class="guide" data-f="guide" hidden>
+          <h3>Render in Live first</h3>
+          <p>These tracks hold nothing an AAF can carry as they are. In Live, freeze and flatten them, save the set, then read it again.</p>
+          <ul data-f="guide-list"></ul>
+          <button class="btn" type="button" data-act="reread">Read again</button>
+        </div>
+        <div data-when="ready working done" data-f="notes-block" hidden>
+          <h3 class="notes-h">Notes</h3>
+          <ul class="notes" data-f="notes"></ul>
+          <details class="notes-more" data-f="notes-info-wrap" hidden>
+            <summary><span data-f="notes-info-count"></span></summary>
+            <ul class="notes" data-f="notes-info"></ul>
+          </details>
+        </div>
+      </div>
+    </div>
+
+  </fieldset>
+  </div>
+  <aside class="col-side">
+    <div class="step">
+      <div class="step-n" aria-hidden="true">03</div>
+      <div class="step-c">
+        <div class="step-h"><h2>AAF</h2></div>
+        <fieldset class="set">
+        <div class="field">
+          <label for="b-output">Destination</label>
+          <div class="field-row">
+            <input class="path" type="text" id="b-output" data-f="output" spellcheck="false" autocomplete="off" placeholder="Set after reading">
+            <button class="btn" type="button" data-act="browse-output">Save as&hellip;</button>
+          </div>
+        </div>
+
+        <div class="opts">
+          <div class="opt" role="radiogroup" aria-labelledby="b-k-media">
+            <span class="opt-k" id="b-k-media">Media</span>
+            <div class="segs">
+              <label class="seg"><input type="radio" name="b-media" value="link" checked><span>Link files</span></label>
+              <label class="seg"><input type="radio" name="b-media" value="embed"><span>Embed audio</span></label>
+            </div>
+          </div>
+        </div>
+
+        <details class="more">
+          <summary>More options</summary>
+          <div class="more-body">
+            <div class="opts">
+              <div class="opt" role="radiogroup" aria-labelledby="b-k-format">
+                <span class="opt-k" id="b-k-format">Format</span>
+                <div class="segs">
+                  <label class="seg"><input type="radio" name="b-format" value="aaf" checked><span>AAF</span></label>
+                  <label class="seg"><input type="radio" name="b-format" value="edl"><span>EDL</span></label>
+                  <label class="seg"><input type="radio" name="b-format" value="xml"><span>XML</span></label>
+                  <label class="seg"><input type="radio" name="b-format" value="fcpxml"><span>FCPXML</span></label>
+                </div>
+              </div>
+              <div class="opt" role="radiogroup" aria-labelledby="b-k-mode">
+                <span class="opt-k" id="b-k-mode">Mode</span>
+                <div class="segs">
+                  <label class="seg"><input type="radio" name="b-mode" value="strict" checked><span>Strict</span></label>
+                  <label class="seg"><input type="radio" name="b-mode" value="permissive"><span>Permissive</span></label>
+                </div>
+              </div>
+            </div>
+            <p class="placeholder">Strict stops when something cannot be carried. Permissive writes the file and lists what was lost.</p>
+          </div>
+        </details>
+        </fieldset>
+
+        <div class="go">
+          <button class="btn btn-primary" type="button" data-act="convert" disabled>Export</button>
+          <div class="working" data-when="working" role="status"><span class="working-bar"></span><span class="working-text">Exporting&hellip;</span></div>
+          <p class="msg msg-error" data-f="convert-error" role="alert" hidden></p>
+          <div class="msg msg-warn" data-f="exists" hidden>
+            <span>This file already exists. Writing again replaces it.</span>
+            <div class="msg-a">
+              <button class="btn" type="button" data-act="convert-replace">Replace</button>
+              <button class="btn btn-quiet" type="button" data-act="cancel-replace">Cancel</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="verdict" data-when="done" data-f="verdict" data-state="ok" role="status" aria-live="polite">
+          <div class="verdict-k">Verification</div>
+          <div class="verdict-w" data-f="verdict-word"></div>
+          <div class="verdict-d" data-f="verdict-detail"></div>
+          <div class="verdict-a">
+            <button class="btn" type="button" data-act="reveal-output">Show in folder</button>
+            <button class="btn" type="button" data-act="save-report">Save report&hellip;</button>
+            <button class="btn" type="button" data-act="convert-permissive" hidden>Write anyway</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </aside>
+</section>
+
+</main>
+
+<!-- Row and item templates. The script clones them and fills the data-f slots;
+     it never builds markup of its own. -->
+<template id="tpl-fact"><div class="fact"><dt data-f="k"></dt><dd><span data-f="v"></span><small data-f="sub"></small></dd></div></template>
+
+<template id="tpl-track"><tr class="row">
+  <td class="c-n" data-f="n"></td>
+  <td class="c-name"><button class="name" type="button" aria-expanded="false"><span data-f="name"></span></button></td>
+  <td class="c-kind" data-f="kind"></td>
+  <td class="c-clips" data-f="clips"></td>
+  <td class="c-lane"><canvas class="lane" data-f="lane" height="16"></canvas></td>
+  <td class="c-state"><span class="st" data-f="state"></span></td>
+</tr></template>
+
+<template id="tpl-track-pick"><tr class="row">
+  <td class="c-pick"><input type="checkbox" data-f="pick"></td>
+  <td class="c-n" data-f="n"></td>
+  <td class="c-name"><button class="name" type="button" aria-expanded="false"><span data-f="name"></span></button></td>
+  <td class="c-kind" data-f="kind"></td>
+  <td class="c-clips" data-f="clips"></td>
+  <td class="c-lane"><canvas class="lane" data-f="lane" height="16"></canvas></td>
+  <td class="c-state"><span class="st" data-f="state"></span></td>
+</tr></template>
+
+<template id="tpl-detail"><tr class="detail"><td>
+  <ul class="reasons" data-f="reasons" hidden></ul>
+  <div class="clips-wrap" data-f="clips-wrap">
+    <table class="clips">
+      <thead><tr><th scope="col">Clip</th><th scope="col">In</th><th scope="col">Out</th><th class="num" scope="col">Gain</th><th scope="col">Fades</th></tr></thead>
+      <tbody data-f="clip-rows"></tbody>
+    </table>
+  </div>
+</td></tr></template>
+
+<template id="tpl-clip"><tr><td data-f="name"></td><td data-f="in"></td><td data-f="out"></td><td class="num" data-f="gain"></td><td data-f="fades"></td></tr></template>
+
+<template id="tpl-note"><li class="note"><span class="note-sev" data-f="sev"></span><span class="note-code"><span data-f="code"></span> <i data-f="count"></i></span><span class="note-text" data-f="text"></span></li></template>
+
+<template id="tpl-item"><li data-f="text"></li></template>
+
+<template id="tpl-line"><span data-f="text"></span></template>
+
+<script>
+/*__STUDIO_JS__*/
+</script>
+</body>
+</html>

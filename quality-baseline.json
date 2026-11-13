@@ -1,0 +1,153 @@
+{
+  "files": {
+    "src/aafton/audio_audit.py": 654,
+    "src/aafton/media_extract.py": 572,
+    "src/aafton/verify.py": 565,
+    "src/aafton/video.py": 511
+  },
+  "functions": {
+    "scripts/corpus_manifest.py::wav_info": {
+      "complexity": 20
+    },
+    "scripts/dump_aaf.py::main": {
+      "complexity": 12
+    },
+    "scripts/make_calibration_session.py::make_calibration_session": {
+      "complexity": 14,
+      "function_lines": 130
+    },
+    "scripts/prepare_audio_audit.py::_real_mask": {
+      "complexity": 12
+    },
+    "scripts/prepare_audio_audit.py::prepare": {
+      "complexity": 13,
+      "function_lines": 99
+    },
+    "scripts/prepare_manual_acceptance.py::_make_session": {
+      "function_lines": 77
+    },
+    "scripts/prepare_manual_acceptance.py::prepare_bundle": {
+      "function_lines": 119
+    },
+    "scripts/prepare_teste_novo.py::prepare": {
+      "complexity": 24,
+      "function_lines": 109
+    },
+    "src/aafton/als_xml.py::validate_document": {
+      "complexity": 46,
+      "function_lines": 131
+    },
+    "src/aafton/audio_audit.py::_clip_ranges": {
+      "complexity": 12
+    },
+    "src/aafton/audio_audit.py::_reference_start": {
+      "complexity": 12
+    },
+    "src/aafton/audio_audit.py::audit_audio": {
+      "complexity": 71,
+      "function_lines": 232
+    },
+    "src/aafton/audio_audit.py::read_wav": {
+      "complexity": 45,
+      "function_lines": 74
+    },
+    "src/aafton/audio_split.py::split_stereo_source": {
+      "complexity": 24,
+      "function_lines": 70
+    },
+    "src/aafton/channels.py::expand_multichannel_track": {
+      "complexity": 12,
+      "function_lines": 64
+    },
+    "src/aafton/cli.py::_session_to_dict": {
+      "function_lines": 62
+    },
+    "src/aafton/media_extract.py::_candidates": {
+      "complexity": 13
+    },
+    "src/aafton/media_extract.py::extract_embedded_essence": {
+      "complexity": 52,
+      "function_lines": 177
+    },
+    "src/aafton/media_extract.py::read_audio_metadata": {
+      "complexity": 42,
+      "function_lines": 132
+    },
+    "src/aafton/media_oracle.py::verify_media_file": {
+      "complexity": 24,
+      "function_lines": 157
+    },
+    "src/aafton/media_oracle.py::verify_session_media": {
+      "complexity": 24,
+      "function_lines": 61
+    },
+    "src/aafton/protools_text.py::ProToolsTextExport.parse": {
+      "complexity": 50,
+      "function_lines": 217
+    },
+    "src/aafton/session_text.py::process_session_text": {
+      "complexity": 50,
+      "function_lines": 205
+    },
+    "src/aafton/stereo.py::_interleave_wav": {
+      "complexity": 15,
+      "function_lines": 81
+    },
+    "src/aafton/stereo.py::_try_pair": {
+      "complexity": 48,
+      "function_lines": 197
+    },
+    "src/aafton/stereo.py::process_stereo_pairing": {
+      "complexity": 35,
+      "function_lines": 125
+    },
+    "src/aafton/timecode.py::exact_edit_rate": {
+      "complexity": 30
+    },
+    "src/aafton/timecode.py::label_to_frames": {
+      "complexity": 11
+    },
+    "src/aafton/turnover.py::_build_turnover_package": {
+      "complexity": 46,
+      "function_lines": 214
+    },
+    "src/aafton/turnover.py::_relink_session": {
+      "complexity": 14
+    },
+    "src/aafton/verify.py::VerifyResult.ok": {
+      "complexity": 13
+    },
+    "src/aafton/verify.py::VerifyResult.to_table": {
+      "complexity": 11,
+      "function_lines": 68
+    },
+    "src/aafton/verify.py::_index": {
+      "complexity": 17
+    },
+    "src/aafton/verify.py::verify_conversion": {
+      "complexity": 83,
+      "function_lines": 323
+    },
+    "src/aafton/video.py::analyze_video": {
+      "complexity": 17
+    },
+    "src/aafton/video.py::find_video_file": {
+      "complexity": 29,
+      "function_lines": 68
+    },
+    "src/aafton/video.py::process_video": {
+      "complexity": 56,
+      "function_lines": 243
+    },
+    "src/aafton/video.py::transcode_to_live_proxy": {
+      "complexity": 16,
+      "function_lines": 94
+    }
+  },
+  "limits": {
+    "complexity": 10,
+    "file_lines": 500,
+    "function_lines": 60
+  },
+  "version": 1
+}

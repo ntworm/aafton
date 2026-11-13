@@ -1,0 +1,24 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+out/
+exports/
+*.log
+*.aafton.json
+tests/output/
+
+scratch/
+.worktrees/
+
+# rascunho de agentes externos
+.agents/
+PROJECT.md
+.local/
+
+# proxies de video que a suite grava ao lado das fixtures
+tests/fixtures/video/*_LiveProxy*.mp4

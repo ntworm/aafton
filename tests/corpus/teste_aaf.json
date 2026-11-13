@@ -1,0 +1,216 @@
+{
+  "corpus": "teste_aaf",
+  "description": "Silencio digital gerado por scripts/make_silence_corpus.py, somente para testes estruturais de TESTE_AFF_PROTOOLS.aaf; nao e midia real do Pro Tools. Fica fora do Git; pasta resolvida por AAFTON_CORPUS_DIR ou .local/corpus/teste_aaf.",
+  "files": [
+    {
+      "name": "TESTE_AFF_PbfzzFCHRcxzwVBBB.wav",
+      "bytes": 1028908,
+      "sha256": "f8105615e821db2269a6a73ff9f9a085a9e5965c660d424abc68fc400d6bff6a",
+      "channels": 1,
+      "sample_rate": 48000,
+      "frames": 514432,
+      "format": "pcm16",
+      "format_tag": "0x0001"
+    },
+    {
+      "name": "TESTE_AFF_PbgzzFCHRzscxVBBB.wav",
+      "bytes": 1028908,
+      "sha256": "f8105615e821db2269a6a73ff9f9a085a9e5965c660d424abc68fc400d6bff6a",
+      "channels": 1,
+      "sample_rate": 48000,
+      "frames": 514432,
+      "format": "pcm16",
+      "format_tag": "0x0001"
+    },
+    {
+      "name": "TESTE_AFF_PbxzzFCHRhsycWBBB.wav",
+      "bytes": 2211628,
+      "sha256": "cd6732d5e17d1e8d58aa93030783710389fcf66fd37fa5ab167e421d11b40609",
+      "channels": 1,
+      "sample_rate": 48000,
+      "frames": 1105792,
+      "format": "pcm16",
+      "format_tag": "0x0001"
+    },
+    {
+      "name": "TESTE_AFF_PdczzFCHRxswwVBBB.wav",
+      "bytes": 5856044,
+      "sha256": "9f78c7cae74723d061b63c8c830449b7dc24da57e6c460e1f526d85510a99f96",
+      "channels": 1,
+      "sample_rate": 48000,
+      "frames": 2928000,
+      "format": "pcm16",
+      "format_tag": "0x0001"
+    },
+    {
+      "name": "TESTE_AFF_PdyzzFCHRsbcdWBBB.wav",
+      "bytes": 931628,
+      "sha256": "768d4224dd78de47befedc9f4082099c87122e2394ac19c1772cf66c3d1cb83e",
+      "channels": 1,
+      "sample_rate": 48000,
+      "frames": 465792,
+      "format": "pcm16",
+      "format_tag": "0x0001"
+    },
+    {
+      "name": "TESTE_AFF_PgczzFCHRqxwwVBBB.wav",
+      "bytes": 5856044,
+      "sha256": "9f78c7cae74723d061b63c8c830449b7dc24da57e6c460e1f526d85510a99f96",
+      "channels": 1,
+      "sample_rate": 48000,
+      "frames": 2928000,
+      "format": "pcm16",
+      "format_tag": "0x0001"
+    },
+    {
+      "name": "TESTE_AFF_PgrzzFCHRpfwbWBBB.wav",
+      "bytes": 14733834,
+      "sha256": "d55ff41666e05434483dcfb748e34af538003be23f782c3b2a7f396ce940156b",
+      "channels": 1,
+      "sample_rate": 48000,
+      "frames": 7366895,
+      "format": "pcm16",
+      "format_tag": "0x0001"
+    },
+    {
+      "name": "TESTE_AFF_PgszzFCHRggrcWBBB.wav",
+      "bytes": 2211628,
+      "sha256": "cd6732d5e17d1e8d58aa93030783710389fcf66fd37fa5ab167e421d11b40609",
+      "channels": 1,
+      "sample_rate": 48000,
+      "frames": 1105792,
+      "format": "pcm16",
+      "format_tag": "0x0001"
+    },
+    {
+      "name": "TESTE_AFF_PmqzzFCHRymcbWBBB.wav",
+      "bytes": 14733834,
+      "sha256": "d55ff41666e05434483dcfb748e34af538003be23f782c3b2a7f396ce940156b",
+      "channels": 1,
+      "sample_rate": 48000,
+      "frames": 7366895,
+      "format": "pcm16",
+      "format_tag": "0x0001"
+    },
+    {
+      "name": "TESTE_AFF_PmvzzFCHRsdwcWBBB.wav",
+      "bytes": 931628,
+      "sha256": "768d4224dd78de47befedc9f4082099c87122e2394ac19c1772cf66c3d1cb83e",
+      "channels": 1,
+      "sample_rate": 48000,
+      "frames": 465792,
+      "format": "pcm16",
+      "format_tag": "0x0001"
+    },
+    {
+      "name": "TESTE_AFF_PmyzzFCHRghcdWBBB.wav",
+      "bytes": 2211628,
+      "sha256": "cd6732d5e17d1e8d58aa93030783710389fcf66fd37fa5ab167e421d11b40609",
+      "channels": 1,
+      "sample_rate": 48000,
+      "frames": 1105792,
+      "format": "pcm16",
+      "format_tag": "0x0001"
+    },
+    {
+      "name": "TESTE_AFF_PqczzFCHRbdxwVBBB.wav",
+      "bytes": 435500,
+      "sha256": "7f838733567e47e328336e0a03c2fa1c2123719775a2bcf45456cea1657b2d56",
+      "channels": 1,
+      "sample_rate": 48000,
+      "frames": 217728,
+      "format": "pcm16",
+      "format_tag": "0x0001"
+    },
+    {
+      "name": "TESTE_AFF_PqpzzFCHRgmpzVBBB.wav",
+      "bytes": 14733834,
+      "sha256": "d55ff41666e05434483dcfb748e34af538003be23f782c3b2a7f396ce940156b",
+      "channels": 1,
+      "sample_rate": 48000,
+      "frames": 7366895,
+      "format": "pcm16",
+      "format_tag": "0x0001"
+    },
+    {
+      "name": "TESTE_AFF_PqzzzFCHRcvfdWBBB.wav",
+      "bytes": 931628,
+      "sha256": "768d4224dd78de47befedc9f4082099c87122e2394ac19c1772cf66c3d1cb83e",
+      "channels": 1,
+      "sample_rate": 48000,
+      "frames": 465792,
+      "format": "pcm16",
+      "format_tag": "0x0001"
+    },
+    {
+      "name": "TESTE_AFF_PsmzzFCHRmrsyVBBB.wav",
+      "bytes": 14733834,
+      "sha256": "d55ff41666e05434483dcfb748e34af538003be23f782c3b2a7f396ce940156b",
+      "channels": 1,
+      "sample_rate": 48000,
+      "frames": 7366895,
+      "format": "pcm16",
+      "format_tag": "0x0001"
+    },
+    {
+      "name": "TESTE_AFF_PsvzzFCHRfpwcWBBB.wav",
+      "bytes": 2211628,
+      "sha256": "cd6732d5e17d1e8d58aa93030783710389fcf66fd37fa5ab167e421d11b40609",
+      "channels": 1,
+      "sample_rate": 48000,
+      "frames": 1105792,
+      "format": "pcm16",
+      "format_tag": "0x0001"
+    },
+    {
+      "name": "TESTE_AFF_PwfzzFCHRqmcxVBBB.wav",
+      "bytes": 431916,
+      "sha256": "98d4426d09dbd987751f50d5a884d3e487fb39c7cd0241065e863be194ea1243",
+      "channels": 1,
+      "sample_rate": 48000,
+      "frames": 215936,
+      "format": "pcm16",
+      "format_tag": "0x0001"
+    },
+    {
+      "name": "TESTE_AFF_PwgzzFCHRxwdxVBBB.wav",
+      "bytes": 431916,
+      "sha256": "98d4426d09dbd987751f50d5a884d3e487fb39c7cd0241065e863be194ea1243",
+      "channels": 1,
+      "sample_rate": 48000,
+      "frames": 215936,
+      "format": "pcm16",
+      "format_tag": "0x0001"
+    },
+    {
+      "name": "TESTE_AFF_PwhzzFCHRqbzxVBBB.wav",
+      "bytes": 14733834,
+      "sha256": "d55ff41666e05434483dcfb748e34af538003be23f782c3b2a7f396ce940156b",
+      "channels": 1,
+      "sample_rate": 48000,
+      "frames": 7366895,
+      "format": "pcm16",
+      "format_tag": "0x0001"
+    },
+    {
+      "name": "TESTE_AFF_PwwzzFCHRvhycWBBB.wav",
+      "bytes": 931628,
+      "sha256": "768d4224dd78de47befedc9f4082099c87122e2394ac19c1772cf66c3d1cb83e",
+      "channels": 1,
+      "sample_rate": 48000,
+      "frames": 465792,
+      "format": "pcm16",
+      "format_tag": "0x0001"
+    },
+    {
+      "name": "TESTE_AFF_PygzzFCHRbzdxVBBB.wav",
+      "bytes": 14733834,
+      "sha256": "d55ff41666e05434483dcfb748e34af538003be23f782c3b2a7f396ce940156b",
+      "channels": 1,
+      "sample_rate": 48000,
+      "frames": 7366895,
+      "format": "pcm16",
+      "format_tag": "0x0001"
+    }
+  ]
+}

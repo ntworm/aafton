@@ -1,0 +1,272 @@
+{
+  "corpus": "teste_novo_reexport",
+  "description": "AAF e WAV reais de TESTE_NOVO, re-export Pro Tools 26.4.1 de 13/10/2026 (D13), fades renderizados, sem automacao de track; sha256 obrigatorio, audio fora do Git.",
+  "files": [
+    {
+      "name": "TESTE_NOVO.aaf",
+      "bytes": 726016,
+      "sha256": "15304181dec64e303143a6edaafacc0bf1dcbccf9a84ad2780f41b1cc562791b",
+      "format": "aaf"
+    },
+    {
+      "name": "TESTE_NOVObssyPCCWgysxFCBB.wav",
+      "bytes": 1355808,
+      "sha256": "7dc8852bbb43cfa1cdc31d84a0183b0a1fc6ec2654d93641a3725fd8997aa7f2",
+      "channels": 1,
+      "sample_rate": 48000,
+      "frames": 441339,
+      "format": "pcm24",
+      "format_tag": "0x0001"
+    },
+    {
+      "name": "TESTE_NOVObvsyPCCWmbwxFCBB.wav",
+      "bytes": 92830,
+      "sha256": "f39a93a110b908598eed02606cadd488a7389f707f3f8ca629b54fd9a718b960",
+      "channels": 1,
+      "sample_rate": 48000,
+      "frames": 22528,
+      "format": "pcm24",
+      "format_tag": "0x0001"
+    },
+    {
+      "name": "TESTE_NOVObwsyPCCWsdxxFCBB.wav",
+      "bytes": 3334484,
+      "sha256": "c9e9f55c6049f980080950ca9d8bb906471fe4e76b344c97fe9ef592cf4f612d",
+      "channels": 1,
+      "sample_rate": 48000,
+      "frames": 1097479,
+      "format": "pcm24",
+      "format_tag": "0x0001"
+    },
+    {
+      "name": "TESTE_NOVOdssyPCCWqbvxFCBB.wav",
+      "bytes": 613950,
+      "sha256": "7aebb956f054ea04660537dae397581de2c12e8fc0c2236cd914f9fa79606a09",
+      "channels": 1,
+      "sample_rate": 48000,
+      "frames": 195333,
+      "format": "pcm24",
+      "format_tag": "0x0001"
+    },
+    {
+      "name": "TESTE_NOVOdvsyPCCWsdwxFCBB.wav",
+      "bytes": 815422,
+      "sha256": "4a4cac191dfd6f509bb05eef78616d0715c49ba169d0b6366e31296fe01709aa",
+      "channels": 1,
+      "sample_rate": 48000,
+      "frames": 262144,
+      "format": "pcm24",
+      "format_tag": "0x0001"
+    },
+    {
+      "name": "TESTE_NOVOdwsyPCCWxgxxFCBB.wav",
+      "bytes": 716606,
+      "sha256": "7be306c473b6c4341cff7b861055b206afe9850f4bac9324bbbd19b1dea57a3e",
+      "channels": 1,
+      "sample_rate": 48000,
+      "frames": 229376,
+      "format": "pcm24",
+      "format_tag": "0x0001"
+    },
+    {
+      "name": "TESTE_NOVOgssyPCCWxdvxFCBB.wav",
+      "bytes": 809246,
+      "sha256": "a78fa5f9e3af8dbfbb68235ee275dd0d13caa8d5b90072fac5f553c7ea889c50",
+      "channels": 1,
+      "sample_rate": 48000,
+      "frames": 260096,
+      "format": "pcm24",
+      "format_tag": "0x0001"
+    },
+    {
+      "name": "TESTE_NOVOgvsyPCCWygwxFCBB.wav",
+      "bytes": 698078,
+      "sha256": "83cd6253bfa7a9ce95d124a6cfe91eec6d8f1ab495bf521bb943b25db7d31a47",
+      "channels": 1,
+      "sample_rate": 48000,
+      "frames": 223232,
+      "format": "pcm24",
+      "format_tag": "0x0001"
+    },
+    {
+      "name": "TESTE_NOVOgwsyPCCWcpxxFCBB.wav",
+      "bytes": 2149438,
+      "sha256": "1cbc95bb793b9637c846125301a96a7535520d8522528d650e088943959af6ba",
+      "channels": 1,
+      "sample_rate": 48000,
+      "frames": 704512,
+      "format": "pcm24",
+      "format_tag": "0x0001"
+    },
+    {
+      "name": "TESTE_NOVOmssyPCCWchvxFCBB.wav",
+      "bytes": 4729238,
+      "sha256": "ebfaec73154da0ae7272616a4024a901deae62e59d965aec9a9d84500fa839ab",
+      "channels": 1,
+      "sample_rate": 48000,
+      "frames": 1559989,
+      "format": "pcm24",
+      "format_tag": "0x0001"
+    },
+    {
+      "name": "TESTE_NOVOmvsyPCCWdpwxFCBB.wav",
+      "bytes": 92830,
+      "sha256": "670df30441623133b6f5ced9aff94a34c0e2bfce22281ba24b803fcb50655ad5",
+      "channels": 1,
+      "sample_rate": 48000,
+      "frames": 22528,
+      "format": "pcm24",
+      "format_tag": "0x0001"
+    },
+    {
+      "name": "TESTE_NOVOmwsyPCCWhrxxFCBB.wav",
+      "bytes": 833178,
+      "sha256": "1041bf30a54488298881eac0bd14c14dfc11a5a373f7355850281760bd756a5b",
+      "channels": 1,
+      "sample_rate": 48000,
+      "frames": 268032,
+      "format": "pcm24",
+      "format_tag": "0x0001"
+    },
+    {
+      "name": "TESTE_NOVOqssyPCCWmpvxFCBB.wav",
+      "bytes": 1355808,
+      "sha256": "41a638784c2811330ba1e45b4248ac9f53a585aa4886e6e191b23ced2f586271",
+      "channels": 1,
+      "sample_rate": 48000,
+      "frames": 441339,
+      "format": "pcm24",
+      "format_tag": "0x0001"
+    },
+    {
+      "name": "TESTE_NOVOqvsyPCCWprwxFCBB.wav",
+      "bytes": 766014,
+      "sha256": "de34d4709a01285af2c2dd087f83f4eada4b1a2ff7a45f8b0791238cce76f1cf",
+      "channels": 1,
+      "sample_rate": 48000,
+      "frames": 245760,
+      "format": "pcm24",
+      "format_tag": "0x0001"
+    },
+    {
+      "name": "TESTE_NOVOqwsyPCCWvvxxFCBB.wav",
+      "bytes": 2216218,
+      "sha256": "d07efe58f0e0a46bb46ac3664ee16480e45a6db1bbafde0edf5364b5e35bca69",
+      "channels": 1,
+      "sample_rate": 48000,
+      "frames": 726656,
+      "format": "pcm24",
+      "format_tag": "0x0001"
+    },
+    {
+      "name": "TESTE_NOVOsssyPCCWrrvxFCBB.wav",
+      "bytes": 613950,
+      "sha256": "395ccbbd81cd3cf05d70551a44e7df420ced0a370503ba371daa117b4f38b1eb",
+      "channels": 1,
+      "sample_rate": 48000,
+      "frames": 195333,
+      "format": "pcm24",
+      "format_tag": "0x0001"
+    },
+    {
+      "name": "TESTE_NOVOsvsyPCCWvvwxFCBB.wav",
+      "bytes": 3334484,
+      "sha256": "949ca34ab5bfec1a31c2ad3cad8b3a05017df850d0a0dfb699d1bd4361c35fa9",
+      "channels": 1,
+      "sample_rate": 48000,
+      "frames": 1097479,
+      "format": "pcm24",
+      "format_tag": "0x0001"
+    },
+    {
+      "name": "TESTE_NOVOswsyPCCWbyxxFCBB.wav",
+      "bytes": 2149438,
+      "sha256": "fd204ecee16d610f52967855b0fb9733c9195f2e1cd32ecd7c0fbe9527184ada",
+      "channels": 1,
+      "sample_rate": 48000,
+      "frames": 704512,
+      "format": "pcm24",
+      "format_tag": "0x0001"
+    },
+    {
+      "name": "TESTE_NOVOwrsyPCCWrgsxFCBB.wav",
+      "bytes": 809246,
+      "sha256": "24eaac8e3a06543810d372ef98245e9d401a2ff55d7bbd1be74884f967478f24",
+      "channels": 1,
+      "sample_rate": 48000,
+      "frames": 260096,
+      "format": "pcm24",
+      "format_tag": "0x0001"
+    },
+    {
+      "name": "TESTE_NOVOwssyPCCWzvvxFCBB.wav",
+      "bytes": 815422,
+      "sha256": "0cf809ba489316b0ecfe1167ea866310b89d808d5ac0601c19f1e34c98d54470",
+      "channels": 1,
+      "sample_rate": 48000,
+      "frames": 262144,
+      "format": "pcm24",
+      "format_tag": "0x0001"
+    },
+    {
+      "name": "TESTE_NOVOwvsyPCCWzxwxFCBB.wav",
+      "bytes": 716606,
+      "sha256": "d8e202b3cbe231e98dbe7afb0945abe2c6cb2b4ae59506b1683ade0a9ef20e1f",
+      "channels": 1,
+      "sample_rate": 48000,
+      "frames": 229376,
+      "format": "pcm24",
+      "format_tag": "0x0001"
+    },
+    {
+      "name": "TESTE_NOVOwwsyPCCWhbyxFCBB.wav",
+      "bytes": 833178,
+      "sha256": "77ac5f27f69d4ea63647c93db4192ce9f7bdb612a6b31f81bc68918f61d79229",
+      "channels": 1,
+      "sample_rate": 48000,
+      "frames": 268032,
+      "format": "pcm24",
+      "format_tag": "0x0001"
+    },
+    {
+      "name": "TESTE_NOVOyrsyPCCWbssxFCBB.wav",
+      "bytes": 4729238,
+      "sha256": "4dd509a1877e0b6388e5a376be2149409b36dcd850915ba46a3d4f9fa620cc48",
+      "channels": 1,
+      "sample_rate": 48000,
+      "frames": 1559989,
+      "format": "pcm24",
+      "format_tag": "0x0001"
+    },
+    {
+      "name": "TESTE_NOVOyssyPCCWdyvxFCBB.wav",
+      "bytes": 698078,
+      "sha256": "9d10112b3adfc932651422586b888da0b06e65d0e63f5631714169d15c889aeb",
+      "channels": 1,
+      "sample_rate": 48000,
+      "frames": 223232,
+      "format": "pcm24",
+      "format_tag": "0x0001"
+    },
+    {
+      "name": "TESTE_NOVOyvsyPCCWgbxxFCBB.wav",
+      "bytes": 766014,
+      "sha256": "9d29b107b4bb1146eec4711f4e944a8d62aaadb3d7102cfbf6eb6009c7ef6530",
+      "channels": 1,
+      "sample_rate": 48000,
+      "frames": 245760,
+      "format": "pcm24",
+      "format_tag": "0x0001"
+    },
+    {
+      "name": "TESTE_NOVOywsyPCCWrdyxFCBB.wav",
+      "bytes": 2216218,
+      "sha256": "e894d4bd71c3a29cb276448f707ff34bdc686c3642a1b15d06ee3248b3889c72",
+      "channels": 1,
+      "sample_rate": 48000,
+      "frames": 726656,
+      "format": "pcm24",
+      "format_tag": "0x0001"
+    }
+  ]
+}

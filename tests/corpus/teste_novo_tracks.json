@@ -1,0 +1,73 @@
+{
+  "source_aaf_sha256": "555214ce6f6ef52156fc7e3c53953b70410e1fae3cdedcd3578c1775f7c2b12f",
+  "reason": "AAF nativo FINAL24 ja nomeia os8slots/4pares; referencias nativas da MESMA entrada AAF, oito bouncesmono entrelacados byte a byte. Referencias pre-export antigas preservadas como diagnostico de ganho/clipping, sem usar ajuste de ganho como aceite.",
+  "sample_rate": 48000,
+  "origin_samples": 182880000,
+  "render_frames": 3360000,
+  "tracks": [
+    {
+      "track": "Landrover Defender DRIVE Steady 4000 rpm INTERNAL.cm",
+      "slot_ids": [
+        3,
+        4
+      ],
+      "reference": "Landrover Defender DRIVE Steady 4000 rpm INTERNAL.cm.wav",
+      "candidate": "Landrover Defender DRIVE Steady 4000 rpm INTERNAL.cm.wav",
+      "reference_sha256": "7f5e0e24c06bdd006d90c3b22c3ff417d2c90039468ce3a563aa2ad218415294",
+      "reference_bytes": 26880668,
+      "reference_channels": 2,
+      "native_vs_aaf_peak_dbfs_lr": [
+        -150.5149978319906,
+        -150.5149978319906
+      ]
+    },
+    {
+      "track": "Hummer H3 DRIVEBY Incoming and Away Normal SG.cm",
+      "slot_ids": [
+        5,
+        6
+      ],
+      "reference": "Hummer H3 DRIVEBY Incoming and Away Normal SG.cm.wav",
+      "candidate": "Hummer H3 DRIVEBY Incoming and Away Normal SG.cm.wav",
+      "reference_sha256": "f3e8133cfe6c3eefe963280bc81c18e0ab7b736230fbb17e017d6422d4e3d243",
+      "reference_bytes": 26880668,
+      "reference_channels": 2,
+      "native_vs_aaf_peak_dbfs_lr": [
+        -144.49439791871097,
+        -144.49439791871097
+      ]
+    },
+    {
+      "track": "Hummer H3 INTERIOR Seat Shift Forward Backward INT.cm",
+      "slot_ids": [
+        7,
+        8
+      ],
+      "reference": "Hummer H3 INTERIOR Seat Shift Forward Backward INT.cm.wav",
+      "candidate": "Hummer H3 INTERIOR Seat Shift Forward Backward INT.cm.wav",
+      "reference_sha256": "370c6a1a4e4fcabd812432255832f2faf46350d3c852ac8948fefd31409ed37b",
+      "reference_bytes": 26880668,
+      "reference_channels": 2,
+      "native_vs_aaf_peak_dbfs_lr": [
+        -144.49439791871097,
+        -150.5149978319906
+      ]
+    },
+    {
+      "track": "Hummer H3 DRIVEBY Kickdown Fast 01 OMNI.cm",
+      "slot_ids": [
+        9,
+        10
+      ],
+      "reference": "Hummer H3 DRIVEBY Kickdown Fast 01 OMNI.cm.wav",
+      "candidate": "Hummer H3 DRIVEBY Kickdown Fast 01 OMNI.cm.wav",
+      "reference_sha256": "ba27b138185e431fc13a0a386cd784637861360eea66856dc06de72cffc67112",
+      "reference_bytes": 26880668,
+      "reference_channels": 2,
+      "native_vs_aaf_peak_dbfs_lr": [
+        -156.53559774527022,
+        -150.5149978319906
+      ]
+    }
+  ]
+}

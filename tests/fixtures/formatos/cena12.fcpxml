@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE fcpxml>
+<fcpxml version="1.9">
+  <resources>
+    <format id="r1" name="FFVideoFormat1080p25" frameDuration="100/2500s" width="1920" height="1080" />
+    <asset id="r2" name="dial01.wav" start="36000s" duration="20s" hasAudio="1" audioSources="1" audioChannels="1" audioRate="48000">
+      <media-rep kind="original-media" src="file:///C:/media/dial01.wav" />
+    </asset>
+    <asset id="r3" name="dial02.wav" start="0s" duration="10s" hasAudio="1" audioSources="1" audioChannels="1" audioRate="48000">
+      <media-rep kind="original-media" src="file:///C:/media/dial02.wav" />
+    </asset>
+  </resources>
+  <library>
+    <event name="CENA12">
+      <project name="CENA12">
+        <sequence format="r1" duration="8s" tcStart="3600s" tcFormat="NDF" audioRate="48k">
+          <spine>
+            <gap name="CENA12" offset="3600s" start="3600s" duration="8s">
+              <asset-clip name="dial01.wav" ref="r2" offset="3600s" start="36001s" duration="2s" lane="-1" audioRole="dialogue" />
+              <asset-clip name="dial02.wav" ref="r3" offset="3601s" start="0s" duration="2s" lane="-2" audioRole="dialogue" />
+              <asset-clip name="dial01.wav" ref="r2" offset="3604s" start="36005s" duration="1s" lane="-1" audioRole="dialogue" />
+              <marker value="TESTE" start="3602s" duration="100/2500s" />
+            </gap>
+          </spine>
+        </sequence>
+      </project>
+    </event>
+  </library>
+</fcpxml>

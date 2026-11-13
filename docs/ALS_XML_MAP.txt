@@ -1,0 +1,255 @@
+Creator: Ableton Live 12.4.5b11
+MinorVersion: 12.0_12402
+SchemaChangeCount: 5
+
+REQUIRED PROTOTYPES
+  AudioTrack        3  OK
+  GroupTrack        2  OK
+  ReturnTrack       1  OK
+  MidiTrack         0  MISSING
+  AudioClip         6  OK
+  Locator           1  OK
+
+--- AudioTrack (direct children) ---
+  LomId Value='0'
+  LomIdView Value='0'
+  IsContentSelectedInDocument Value='false'
+  PreferredContentViewMode Value='0'
+  TrackDelay
+  Name
+  Color Value='6'
+  AutomationEnvelopes
+  TrackGroupId Value='17'
+  TrackUnfolded Value='true'
+  DevicesListWrapper
+  ClipSlotsListWrapper
+  ArrangementClipsListWrapper
+  TakeLanesListWrapper
+  ViewData Value='{"push-selected-note-mode": "play", "push-instrument-selected-notes": [36], "push-note-repeat-rate": 0.5, "push-note-repeat-enabled": false}'
+  TakeLanes
+  LinkedTrackGroupId Value='-1'
+  SavedPlayingSlot Value='-1'
+  SavedPlayingOffset Value='0'
+  Freeze Value='false'
+  PostProcessFreezeClips Value='0'
+  DeviceChain
+  IsTuned Value='true'
+
+--- GroupTrack (direct children) ---
+  LomId Value='0'
+  LomIdView Value='0'
+  IsContentSelectedInDocument Value='false'
+  PreferredContentViewMode Value='0'
+  TrackDelay
+  Name
+  Color Value='6'
+  AutomationEnvelopes
+  TrackGroupId Value='-1'
+  TrackUnfolded Value='true'
+  DevicesListWrapper
+  ClipSlotsListWrapper
+  ArrangementClipsListWrapper
+  TakeLanesListWrapper
+  ViewData Value='{}'
+  TakeLanes
+  LinkedTrackGroupId Value='-1'
+  Slots
+  Freeze Value='false'
+  DeviceChain
+
+--- ReturnTrack (direct children) ---
+  LomId Value='0'
+  LomIdView Value='0'
+  IsContentSelectedInDocument Value='false'
+  PreferredContentViewMode Value='0'
+  TrackDelay
+  Name
+  Color Value='17'
+  AutomationEnvelopes
+  TrackGroupId Value='-1'
+  TrackUnfolded Value='false'
+  DevicesListWrapper
+  ClipSlotsListWrapper
+  ArrangementClipsListWrapper
+  TakeLanesListWrapper
+  ViewData Value='{}'
+  TakeLanes
+  LinkedTrackGroupId Value='-1'
+  DeviceChain
+
+--- AudioClip (direct children) ---
+  LomId Value='0'
+  LomIdView Value='0'
+  CurrentStart Value='48'
+  CurrentEnd Value='56'
+  Loop
+  Name Value='Two Step Garage 135 bpm'
+  Annotation Value=''
+  Color Value='6'
+  LaunchMode Value='0'
+  LaunchQuantisation Value='0'
+  TimeSignature
+  Envelopes
+  ScrollerTimePreserver
+  TimeSelection
+  Legato Value='false'
+  Ram Value='false'
+  GrooveSettings
+  Disabled Value='false'
+  VelocityAmount Value='0'
+  FollowAction
+  Grid
+  FreezeStart Value='0'
+  FreezeEnd Value='0'
+  IsWarped Value='true'
+  TakeId Value='1'
+  IsInKey Value='true'
+  ScaleInformation
+  AutomationEnvelopesListWrapper
+  SampleRef
+  Onsets
+  WarpMode Value='0'
+  GranularityTones Value='30'
+  GranularityTexture Value='65'
+  FluctuationTexture Value='25'
+  TransientResolution Value='6'
+  TransientLoopMode Value='2'
+  TransientEnvelope Value='100'
+  ComplexProFormants Value='100'
+  ComplexProEnvelope Value='128'
+  Sync Value='true'
+  HiQ Value='true'
+  Fade Value='true'
+  Fades
+  PitchCoarse Value='0'
+  PitchFine Value='0'
+  SampleVolume Value='0.6432777047'
+  WarpMarkers
+  SavedWarpMarkersForStretched
+  MarkersGenerated Value='true'
+  IsSongTempoLeader Value='false'
+
+--- Locator (direct children) ---
+  LomId Value='0'
+  Time Value='44'
+  Name Value='FFOA'
+  Annotation Value=''
+  IsSongStart Value='false'
+
+--- AudioClip: full tree of tags ---
+  AudioClip/Annotation
+  AudioClip/AutomationEnvelopesListWrapper
+  AudioClip/Color
+  AudioClip/ComplexProEnvelope
+  AudioClip/ComplexProFormants
+  AudioClip/CurrentEnd
+  AudioClip/CurrentStart
+  AudioClip/Disabled
+  AudioClip/Envelopes
+  AudioClip/Fade
+  AudioClip/Fades
+  AudioClip/Fades/ClipFadesAreInitialized
+  AudioClip/Fades/CrossfadeInState
+  AudioClip/Fades/FadeInCurveSkew
+  AudioClip/Fades/FadeInCurveSlope
+  AudioClip/Fades/FadeInLength
+  AudioClip/Fades/FadeOutCurveSkew
+  AudioClip/Fades/FadeOutCurveSlope
+  AudioClip/Fades/FadeOutLength
+  AudioClip/Fades/IsDefaultFadeIn
+  AudioClip/Fades/IsDefaultFadeOut
+  AudioClip/FluctuationTexture
+  AudioClip/FollowAction
+  AudioClip/FollowAction/FollowActionA
+  AudioClip/FollowAction/FollowActionB
+  AudioClip/FollowAction/FollowActionEnabled
+  AudioClip/FollowAction/FollowChanceA
+  AudioClip/FollowAction/FollowChanceB
+  AudioClip/FollowAction/FollowTime
+  AudioClip/FollowAction/IsLinked
+  AudioClip/FollowAction/JumpIndexA
+  AudioClip/FollowAction/JumpIndexB
+  AudioClip/FollowAction/LoopIterations
+  AudioClip/FreezeEnd
+  AudioClip/FreezeStart
+  AudioClip/GranularityTexture
+  AudioClip/GranularityTones
+  AudioClip/Grid
+  AudioClip/Grid/Fixed
+  AudioClip/Grid/FixedDenominator
+  AudioClip/Grid/FixedNumerator
+  AudioClip/Grid/GridIntervalPixel
+  AudioClip/Grid/Ntoles
+  AudioClip/Grid/SnapToGrid
+  AudioClip/GrooveSettings
+  AudioClip/GrooveSettings/GrooveId
+  AudioClip/HiQ
+  AudioClip/IsInKey
+  AudioClip/IsSongTempoLeader
+  AudioClip/IsWarped
+  AudioClip/LaunchMode
+  AudioClip/LaunchQuantisation
+  AudioClip/Legato
+  AudioClip/LomId
+  AudioClip/LomIdView
+  AudioClip/Loop
+  AudioClip/Loop/HiddenLoopEnd
+  AudioClip/Loop/HiddenLoopStart
+  AudioClip/Loop/LoopEnd
+  AudioClip/Loop/LoopOn
+  AudioClip/Loop/LoopStart
+  AudioClip/Loop/OutMarker
+  AudioClip/Loop/StartRelative
+  AudioClip/MarkersGenerated
+  AudioClip/Name
+  AudioClip/Onsets
+  AudioClip/Onsets/HasUserOnsets
+  AudioClip/Onsets/UserOnsets
+  AudioClip/PitchCoarse
+  AudioClip/PitchFine
+  AudioClip/Ram
+  AudioClip/SampleRef
+  AudioClip/SampleRef/DefaultDuration
+  AudioClip/SampleRef/DefaultSampleRate
+  AudioClip/SampleRef/FileRef
+  AudioClip/SampleRef/FileRef/LivePackId
+  AudioClip/SampleRef/FileRef/LivePackName
+  AudioClip/SampleRef/FileRef/OriginalCrc
+  AudioClip/SampleRef/FileRef/OriginalFileSize
+  AudioClip/SampleRef/FileRef/Path
+  AudioClip/SampleRef/FileRef/RelativePath
+  AudioClip/SampleRef/FileRef/RelativePathType
+  AudioClip/SampleRef/FileRef/SourceHint
+  AudioClip/SampleRef/FileRef/Type
+  AudioClip/SampleRef/LastModDate
+  AudioClip/SampleRef/SampleUsageHint
+  AudioClip/SampleRef/SamplesToAutoWarp
+  AudioClip/SampleRef/SourceContext
+  AudioClip/SampleRef/SourceContext/SourceContext/BrowserContentPath
+  AudioClip/SampleRef/SourceContext/SourceContext/LocalFiltersJson
+  AudioClip/SampleRef/SourceContext/SourceContext/OriginalFileRef
+  AudioClip/SampleVolume
+  AudioClip/SavedWarpMarkersForStretched
+  AudioClip/ScaleInformation
+  AudioClip/ScaleInformation/Root
+  AudioClip/ScrollerTimePreserver
+  AudioClip/ScrollerTimePreserver/LeftTime
+  AudioClip/ScrollerTimePreserver/RightTime
+  AudioClip/Sync
+  AudioClip/TakeId
+  AudioClip/TimeSelection
+  AudioClip/TimeSelection/AnchorTime
+  AudioClip/TimeSelection/OtherTime
+  AudioClip/TimeSignature
+  AudioClip/TimeSignature/TimeSignatures
+  AudioClip/TimeSignature/TimeSignatures/RemoteableTimeSignature
+  AudioClip/TimeSignature/TimeSignatures/RemoteableTimeSignature/Denominator
+  AudioClip/TimeSignature/TimeSignatures/RemoteableTimeSignature/Numerator
+  AudioClip/TimeSignature/TimeSignatures/RemoteableTimeSignature/Time
+  AudioClip/TransientEnvelope
+  AudioClip/TransientLoopMode
+  AudioClip/TransientResolution
+  AudioClip/VelocityAmount
+  AudioClip/WarpMarkers
+  AudioClip/WarpMarkers/WarpMarker
+  AudioClip/WarpMode

@@ -1,0 +1,69 @@
+{
+  "source_aaf_sha256": "15304181dec64e303143a6edaafacc0bf1dcbccf9a84ad2780f41b1cc562791b",
+  "reason": "AAF original sem SlotName; nomes/pares explícitos só na cópia local, autorização do dono do material, 13/10/2026. Correspondência conferida por probes nos dois canais contra bounces; isto não é aceite sonoro.",
+  "sample_rate": 48000,
+  "origin_samples": 182880000,
+  "render_frames": 3360000,
+  "tracks": [
+    {
+      "track": "Landrover Defender DRIVE Steady 4000 rpm INTERNAL",
+      "slot_ids": [
+        3,
+        4
+      ],
+      "reference": "Landrover Defender DRIVE Steady 4000 rpm INTERNAL-St.wav",
+      "candidate": "Landrover Defender DRIVE Steady 4000 rpm INTERNAL.wav",
+      "reference_sha256": "52dac2bfd1c3d15bf4382013aa3a800eb9735ad2ddc25fa8e3bb15099f1f7c73",
+      "reference_bytes": 26988578,
+      "probe_correlation_lr": [
+        1.0000000000000038,
+        1.0000000000000033
+      ]
+    },
+    {
+      "track": "Hummer H3 DRIVEBY Incoming and Away Normal SG",
+      "slot_ids": [
+        5,
+        6
+      ],
+      "reference": "Hummer H3 DRIVEBY Incoming and Away Normal SG-St.wav",
+      "candidate": "Hummer H3 DRIVEBY Incoming and Away Normal SG.wav",
+      "reference_sha256": "cdaa4f34d961e414d78ffd58a977af320b21381d40e4497fd566eca7cd4ff896",
+      "reference_bytes": 26988578,
+      "probe_correlation_lr": [
+        0.9999693266527905,
+        0.9999632090120301
+      ]
+    },
+    {
+      "track": "Hummer H3 INTERIOR Seat Shift Forward Backward INT",
+      "slot_ids": [
+        7,
+        8
+      ],
+      "reference": "Hummer H3 INTERIOR Seat Shift Forward Backward INT-St.wav",
+      "candidate": "Hummer H3 INTERIOR Seat Shift Forward Backward INT.wav",
+      "reference_sha256": "f62d3ccb0b10a4dae0b178102b057873f692d4455fe23fad53613783f3d707eb",
+      "reference_bytes": 26988578,
+      "probe_correlation_lr": [
+        0.9999981882679886,
+        0.9999982714937964
+      ]
+    },
+    {
+      "track": "Hummer H3 DRIVEBY Kickdown Fast 01 OMNI",
+      "slot_ids": [
+        9,
+        10
+      ],
+      "reference": "Hummer H3 DRIVEBY Kickdown Fast 01 OMNI-St.wav",
+      "candidate": "Hummer H3 DRIVEBY Kickdown Fast 01 OMNI.wav",
+      "reference_sha256": "5471f5551f6d8897cb4935141dce6483ec24863fed5494021f15e5591d550e20",
+      "reference_bytes": 26988578,
+      "probe_correlation_lr": [
+        0.9999935431048566,
+        0.9999937392400882
+      ]
+    }
+  ]
+}

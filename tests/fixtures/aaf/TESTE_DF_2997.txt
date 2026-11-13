@@ -1,0 +1,211 @@
+SESSION NAME:	TESTE_NOVO
+SAMPLE RATE:	48000.000000
+BIT DEPTH:	24-bit
+SESSION START TIMECODE:	00:00:00:00
+TIMECODE FORMAT:	29.97 Frame
+# OF AUDIO TRACKS:	4
+# OF AUDIO CLIPS:	98
+# OF AUDIO FILES:	4
+
+
+O N L I N E  F I L E S  I N  S E S S I O N
+Filename                                              	Location
+Hummer H3 DRIVEBY Kickdown Fast 01 OMNI.wav           	c:\Users\aafuser\Documents\TESTE_NOVO\Audio Files\
+Hummer H3 DRIVEBY Incoming and Away Normal SG.wav     	c:\Users\aafuser\Documents\TESTE_NOVO\Audio Files\
+Landrover Defender DRIVE Steady 4000 rpm INTERNAL.wav 	c:\Users\aafuser\Documents\TESTE_NOVO\Audio Files\
+Hummer H3 INTERIOR Seat Shift Forward Backward INT.wav	c:\Users\aafuser\Documents\TESTE_NOVO\Audio Files\
+
+
+O F F L I N E  F I L E S  I N  S E S S I O N
+Filename                                              	Location
+
+
+O N L I N E  C L I P S  I N  S E S S I O N
+CLIP NAME                                              	Source File
+Hummer H3 DRIVEBY Incoming and Away Normal SG-01.L     	Hummer H3 DRIVEBY Incoming and Away Normal SG.wav	[1]
+Hummer H3 DRIVEBY Incoming and Away Normal SG-01.L     	Hummer H3 DRIVEBY Incoming and Away Normal SG.wav	[1]
+Hummer H3 DRIVEBY Incoming and Away Normal SG-01.R     	Hummer H3 DRIVEBY Incoming and Away Normal SG.wav	[2]
+Hummer H3 DRIVEBY Incoming and Away Normal SG-01.R     	Hummer H3 DRIVEBY Incoming and Away Normal SG.wav	[2]
+Hummer H3 DRIVEBY Incoming and Away Normal SG-02.L     	Hummer H3 DRIVEBY Incoming and Away Normal SG.wav	[1]
+Hummer H3 DRIVEBY Incoming and Away Normal SG-02.R     	Hummer H3 DRIVEBY Incoming and Away Normal SG.wav	[2]
+Hummer H3 DRIVEBY Incoming and Away Normal SG-03.L     	Hummer H3 DRIVEBY Incoming and Away Normal SG.wav	[1]
+Hummer H3 DRIVEBY Incoming and Away Normal SG-03.R     	Hummer H3 DRIVEBY Incoming and Away Normal SG.wav	[2]
+Hummer H3 DRIVEBY Incoming and Away Normal SG-04.L     	Hummer H3 DRIVEBY Incoming and Away Normal SG.wav	[1]
+Hummer H3 DRIVEBY Incoming and Away Normal SG-04.R     	Hummer H3 DRIVEBY Incoming and Away Normal SG.wav	[2]
+Hummer H3 DRIVEBY Incoming and Away Normal SG-05.L     	Hummer H3 DRIVEBY Incoming and Away Normal SG.wav	[1]
+Hummer H3 DRIVEBY Incoming and Away Normal SG-05.L     	Hummer H3 DRIVEBY Incoming and Away Normal SG.wav	[1]
+Hummer H3 DRIVEBY Incoming and Away Normal SG-05.L     	Hummer H3 DRIVEBY Incoming and Away Normal SG.wav	[1]
+Hummer H3 DRIVEBY Incoming and Away Normal SG-05.L     	Hummer H3 DRIVEBY Incoming and Away Normal SG.wav	[1]
+Hummer H3 DRIVEBY Incoming and Away Normal SG-05.L     	Hummer H3 DRIVEBY Incoming and Away Normal SG.wav	[1]
+Hummer H3 DRIVEBY Incoming and Away Normal SG-05.L     	Hummer H3 DRIVEBY Incoming and Away Normal SG.wav	[1]
+Hummer H3 DRIVEBY Incoming and Away Normal SG-05.R     	Hummer H3 DRIVEBY Incoming and Away Normal SG.wav	[2]
+Hummer H3 DRIVEBY Incoming and Away Normal SG-05.R     	Hummer H3 DRIVEBY Incoming and Away Normal SG.wav	[2]
+Hummer H3 DRIVEBY Incoming and Away Normal SG-05.R     	Hummer H3 DRIVEBY Incoming and Away Normal SG.wav	[2]
+Hummer H3 DRIVEBY Incoming and Away Normal SG-05.R     	Hummer H3 DRIVEBY Incoming and Away Normal SG.wav	[2]
+Hummer H3 DRIVEBY Incoming and Away Normal SG-05.R     	Hummer H3 DRIVEBY Incoming and Away Normal SG.wav	[2]
+Hummer H3 DRIVEBY Incoming and Away Normal SG-05.R     	Hummer H3 DRIVEBY Incoming and Away Normal SG.wav	[2]
+Hummer H3 DRIVEBY Incoming and Away Normal SG-06.L     	Hummer H3 DRIVEBY Incoming and Away Normal SG.wav	[1]
+Hummer H3 DRIVEBY Incoming and Away Normal SG-06.R     	Hummer H3 DRIVEBY Incoming and Away Normal SG.wav	[2]
+Hummer H3 DRIVEBY Incoming and Away Normal SG-07.L     	Hummer H3 DRIVEBY Incoming and Away Normal SG.wav	[1]
+Hummer H3 DRIVEBY Incoming and Away Normal SG-07.L     	Hummer H3 DRIVEBY Incoming and Away Normal SG.wav	[1]
+Hummer H3 DRIVEBY Incoming and Away Normal SG-07.L     	Hummer H3 DRIVEBY Incoming and Away Normal SG.wav	[1]
+Hummer H3 DRIVEBY Incoming and Away Normal SG-07.L     	Hummer H3 DRIVEBY Incoming and Away Normal SG.wav	[1]
+Hummer H3 DRIVEBY Incoming and Away Normal SG-07.L     	Hummer H3 DRIVEBY Incoming and Away Normal SG.wav	[1]
+Hummer H3 DRIVEBY Incoming and Away Normal SG-07.R     	Hummer H3 DRIVEBY Incoming and Away Normal SG.wav	[2]
+Hummer H3 DRIVEBY Incoming and Away Normal SG-07.R     	Hummer H3 DRIVEBY Incoming and Away Normal SG.wav	[2]
+Hummer H3 DRIVEBY Incoming and Away Normal SG-07.R     	Hummer H3 DRIVEBY Incoming and Away Normal SG.wav	[2]
+Hummer H3 DRIVEBY Incoming and Away Normal SG-07.R     	Hummer H3 DRIVEBY Incoming and Away Normal SG.wav	[2]
+Hummer H3 DRIVEBY Incoming and Away Normal SG-07.R     	Hummer H3 DRIVEBY Incoming and Away Normal SG.wav	[2]
+Hummer H3 DRIVEBY Incoming and Away Normal SG-08.L     	Hummer H3 DRIVEBY Incoming and Away Normal SG.wav	[1]
+Hummer H3 DRIVEBY Incoming and Away Normal SG-08.L     	Hummer H3 DRIVEBY Incoming and Away Normal SG.wav	[1]
+Hummer H3 DRIVEBY Incoming and Away Normal SG-08.L     	Hummer H3 DRIVEBY Incoming and Away Normal SG.wav	[1]
+Hummer H3 DRIVEBY Incoming and Away Normal SG-08.L     	Hummer H3 DRIVEBY Incoming and Away Normal SG.wav	[1]
+Hummer H3 DRIVEBY Incoming and Away Normal SG-08.L     	Hummer H3 DRIVEBY Incoming and Away Normal SG.wav	[1]
+Hummer H3 DRIVEBY Incoming and Away Normal SG-08.L     	Hummer H3 DRIVEBY Incoming and Away Normal SG.wav	[1]
+Hummer H3 DRIVEBY Incoming and Away Normal SG-08.L     	Hummer H3 DRIVEBY Incoming and Away Normal SG.wav	[1]
+Hummer H3 DRIVEBY Incoming and Away Normal SG-08.R     	Hummer H3 DRIVEBY Incoming and Away Normal SG.wav	[2]
+Hummer H3 DRIVEBY Incoming and Away Normal SG-08.R     	Hummer H3 DRIVEBY Incoming and Away Normal SG.wav	[2]
+Hummer H3 DRIVEBY Incoming and Away Normal SG-08.R     	Hummer H3 DRIVEBY Incoming and Away Normal SG.wav	[2]
+Hummer H3 DRIVEBY Incoming and Away Normal SG-08.R     	Hummer H3 DRIVEBY Incoming and Away Normal SG.wav	[2]
+Hummer H3 DRIVEBY Incoming and Away Normal SG-08.R     	Hummer H3 DRIVEBY Incoming and Away Normal SG.wav	[2]
+Hummer H3 DRIVEBY Incoming and Away Normal SG-08.R     	Hummer H3 DRIVEBY Incoming and Away Normal SG.wav	[2]
+Hummer H3 DRIVEBY Incoming and Away Normal SG-08.R     	Hummer H3 DRIVEBY Incoming and Away Normal SG.wav	[2]
+Hummer H3 DRIVEBY Incoming and Away Normal SG.L        	Hummer H3 DRIVEBY Incoming and Away Normal SG.wav	[1]
+Hummer H3 DRIVEBY Incoming and Away Normal SG.R        	Hummer H3 DRIVEBY Incoming and Away Normal SG.wav	[2]
+Hummer H3 DRIVEBY Kickdown Fast 01 OMNI-01.L           	Hummer H3 DRIVEBY Kickdown Fast 01 OMNI.wav	[1]
+Hummer H3 DRIVEBY Kickdown Fast 01 OMNI-01.L           	Hummer H3 DRIVEBY Kickdown Fast 01 OMNI.wav	[1]
+Hummer H3 DRIVEBY Kickdown Fast 01 OMNI-01.L           	Hummer H3 DRIVEBY Kickdown Fast 01 OMNI.wav	[1]
+Hummer H3 DRIVEBY Kickdown Fast 01 OMNI-01.L           	Hummer H3 DRIVEBY Kickdown Fast 01 OMNI.wav	[1]
+Hummer H3 DRIVEBY Kickdown Fast 01 OMNI-01.L           	Hummer H3 DRIVEBY Kickdown Fast 01 OMNI.wav	[1]
+Hummer H3 DRIVEBY Kickdown Fast 01 OMNI-01.R           	Hummer H3 DRIVEBY Kickdown Fast 01 OMNI.wav	[2]
+Hummer H3 DRIVEBY Kickdown Fast 01 OMNI-01.R           	Hummer H3 DRIVEBY Kickdown Fast 01 OMNI.wav	[2]
+Hummer H3 DRIVEBY Kickdown Fast 01 OMNI-01.R           	Hummer H3 DRIVEBY Kickdown Fast 01 OMNI.wav	[2]
+Hummer H3 DRIVEBY Kickdown Fast 01 OMNI-01.R           	Hummer H3 DRIVEBY Kickdown Fast 01 OMNI.wav	[2]
+Hummer H3 DRIVEBY Kickdown Fast 01 OMNI-01.R           	Hummer H3 DRIVEBY Kickdown Fast 01 OMNI.wav	[2]
+Hummer H3 DRIVEBY Kickdown Fast 01 OMNI.L              	Hummer H3 DRIVEBY Kickdown Fast 01 OMNI.wav	[1]
+Hummer H3 DRIVEBY Kickdown Fast 01 OMNI.R              	Hummer H3 DRIVEBY Kickdown Fast 01 OMNI.wav	[2]
+Hummer H3 INTERIOR Seat Shift Forward Backward INT-01.L	Hummer H3 INTERIOR Seat Shift Forward Backward INT.wav	[1]
+Hummer H3 INTERIOR Seat Shift Forward Backward INT-01.R	Hummer H3 INTERIOR Seat Shift Forward Backward INT.wav	[2]
+Hummer H3 INTERIOR Seat Shift Forward Backward INT-02.L	Hummer H3 INTERIOR Seat Shift Forward Backward INT.wav	[1]
+Hummer H3 INTERIOR Seat Shift Forward Backward INT-02.L	Hummer H3 INTERIOR Seat Shift Forward Backward INT.wav	[1]
+Hummer H3 INTERIOR Seat Shift Forward Backward INT-02.L	Hummer H3 INTERIOR Seat Shift Forward Backward INT.wav	[1]
+Hummer H3 INTERIOR Seat Shift Forward Backward INT-02.L	Hummer H3 INTERIOR Seat Shift Forward Backward INT.wav	[1]
+Hummer H3 INTERIOR Seat Shift Forward Backward INT-02.L	Hummer H3 INTERIOR Seat Shift Forward Backward INT.wav	[1]
+Hummer H3 INTERIOR Seat Shift Forward Backward INT-02.L	Hummer H3 INTERIOR Seat Shift Forward Backward INT.wav	[1]
+Hummer H3 INTERIOR Seat Shift Forward Backward INT-02.L	Hummer H3 INTERIOR Seat Shift Forward Backward INT.wav	[1]
+Hummer H3 INTERIOR Seat Shift Forward Backward INT-02.L	Hummer H3 INTERIOR Seat Shift Forward Backward INT.wav	[1]
+Hummer H3 INTERIOR Seat Shift Forward Backward INT-02.R	Hummer H3 INTERIOR Seat Shift Forward Backward INT.wav	[2]
+Hummer H3 INTERIOR Seat Shift Forward Backward INT-02.R	Hummer H3 INTERIOR Seat Shift Forward Backward INT.wav	[2]
+Hummer H3 INTERIOR Seat Shift Forward Backward INT-02.R	Hummer H3 INTERIOR Seat Shift Forward Backward INT.wav	[2]
+Hummer H3 INTERIOR Seat Shift Forward Backward INT-02.R	Hummer H3 INTERIOR Seat Shift Forward Backward INT.wav	[2]
+Hummer H3 INTERIOR Seat Shift Forward Backward INT-02.R	Hummer H3 INTERIOR Seat Shift Forward Backward INT.wav	[2]
+Hummer H3 INTERIOR Seat Shift Forward Backward INT-02.R	Hummer H3 INTERIOR Seat Shift Forward Backward INT.wav	[2]
+Hummer H3 INTERIOR Seat Shift Forward Backward INT-02.R	Hummer H3 INTERIOR Seat Shift Forward Backward INT.wav	[2]
+Hummer H3 INTERIOR Seat Shift Forward Backward INT-02.R	Hummer H3 INTERIOR Seat Shift Forward Backward INT.wav	[2]
+Hummer H3 INTERIOR Seat Shift Forward Backward INT.L   	Hummer H3 INTERIOR Seat Shift Forward Backward INT.wav	[1]
+Hummer H3 INTERIOR Seat Shift Forward Backward INT.R   	Hummer H3 INTERIOR Seat Shift Forward Backward INT.wav	[2]
+Landrover Defender DRIVE Steady 4000 rpm INTERNAL-01.L 	Landrover Defender DRIVE Steady 4000 rpm INTERNAL.wav	[1]
+Landrover Defender DRIVE Steady 4000 rpm INTERNAL-01.L 	Landrover Defender DRIVE Steady 4000 rpm INTERNAL.wav	[1]
+Landrover Defender DRIVE Steady 4000 rpm INTERNAL-01.L 	Landrover Defender DRIVE Steady 4000 rpm INTERNAL.wav	[1]
+Landrover Defender DRIVE Steady 4000 rpm INTERNAL-01.L 	Landrover Defender DRIVE Steady 4000 rpm INTERNAL.wav	[1]
+Landrover Defender DRIVE Steady 4000 rpm INTERNAL-01.L 	Landrover Defender DRIVE Steady 4000 rpm INTERNAL.wav	[1]
+Landrover Defender DRIVE Steady 4000 rpm INTERNAL-01.R 	Landrover Defender DRIVE Steady 4000 rpm INTERNAL.wav	[2]
+Landrover Defender DRIVE Steady 4000 rpm INTERNAL-01.R 	Landrover Defender DRIVE Steady 4000 rpm INTERNAL.wav	[2]
+Landrover Defender DRIVE Steady 4000 rpm INTERNAL-01.R 	Landrover Defender DRIVE Steady 4000 rpm INTERNAL.wav	[2]
+Landrover Defender DRIVE Steady 4000 rpm INTERNAL-01.R 	Landrover Defender DRIVE Steady 4000 rpm INTERNAL.wav	[2]
+Landrover Defender DRIVE Steady 4000 rpm INTERNAL-01.R 	Landrover Defender DRIVE Steady 4000 rpm INTERNAL.wav	[2]
+Landrover Defender DRIVE Steady 4000 rpm INTERNAL-02.L 	Landrover Defender DRIVE Steady 4000 rpm INTERNAL.wav	[1]
+Landrover Defender DRIVE Steady 4000 rpm INTERNAL-02.L 	Landrover Defender DRIVE Steady 4000 rpm INTERNAL.wav	[1]
+Landrover Defender DRIVE Steady 4000 rpm INTERNAL-02.R 	Landrover Defender DRIVE Steady 4000 rpm INTERNAL.wav	[2]
+Landrover Defender DRIVE Steady 4000 rpm INTERNAL-02.R 	Landrover Defender DRIVE Steady 4000 rpm INTERNAL.wav	[2]
+Landrover Defender DRIVE Steady 4000 rpm INTERNAL.L    	Landrover Defender DRIVE Steady 4000 rpm INTERNAL.wav	[1]
+Landrover Defender DRIVE Steady 4000 rpm INTERNAL.R    	Landrover Defender DRIVE Steady 4000 rpm INTERNAL.wav	[2]
+
+
+P L U G - I N S  L I S T I N G
+MANUFACTURER            	PLUG-IN NAME            	VERSION         	FORMAT          	STEMS                   	NUMBER OF INSTANCES
+
+
+T R A C K  L I S T I N G
+TRACK NAME:	Hummer H3 INTERIOR Seat Shift Forward Backward INT (Stereo)
+COMMENTS:	
+USER DELAY:	0 Samples
+STATE: 
+PLUG-INS: 
+CHANNEL 	EVENT   	CLIP NAME                     	START TIME    	END TIME      	DURATION      	STATE
+1       	1       	(fade in)                     	   01:03:49:25	   01:03:54:29	   00:00:05:03	Unmuted
+1       	2       	Hummer H3 INTERIOR Seat Shift Forward Backward INT-01.L	   01:03:54:29	   01:03:58:05	   00:00:03:06	Unmuted
+1       	3       	(fade out)                    	   01:03:58:05	   01:04:02:28	   00:00:04:23	Unmuted
+1       	4       	Hummer H3 INTERIOR Seat Shift Forward Backward INT-02.L	   01:04:04:04	   01:04:20:22	   00:00:16:18	Unmuted
+
+
+2       	1       	(fade in)                     	   01:03:49:25	   01:03:54:29	   00:00:05:03	Unmuted
+2       	2       	Hummer H3 INTERIOR Seat Shift Forward Backward INT-01.R	   01:03:54:29	   01:03:58:05	   00:00:03:06	Unmuted
+2       	3       	(fade out)                    	   01:03:58:05	   01:04:02:28	   00:00:04:23	Unmuted
+2       	4       	Hummer H3 INTERIOR Seat Shift Forward Backward INT-02.R	   01:04:04:04	   01:04:20:22	   00:00:16:18	Unmuted
+
+
+TRACK NAME:	Landrover Defender DRIVE Steady 4000 rpm INTERNAL (Stereo)
+COMMENTS:	
+USER DELAY:	0 Samples
+STATE: 
+PLUG-INS: 
+CHANNEL 	EVENT   	CLIP NAME                     	START TIME    	END TIME      	DURATION      	STATE
+1       	1       	(fade in)                     	   01:03:54:00	   01:03:59:13	   00:00:05:12	Unmuted
+1       	2       	Hummer H3 DRIVEBY Incoming and Away Normal SG-06.L	   01:03:59:13	   01:04:01:22	   00:00:02:09	Unmuted
+1       	3       	Landrover Defender DRIVE Steady 4000 rpm INTERNAL-01.L	   01:04:05:21	   01:04:09:07	   00:00:03:15	Unmuted
+1       	4       	(cross fade)                  	   01:04:09:07	   01:04:13:08	   00:00:04:01	Unmuted
+1       	5       	Landrover Defender DRIVE Steady 4000 rpm INTERNAL-02.L	   01:04:13:08	   01:04:16:28	   00:00:03:19	Unmuted
+
+
+2       	1       	(fade in)                     	   01:03:54:00	   01:03:59:13	   00:00:05:12	Unmuted
+2       	2       	Hummer H3 DRIVEBY Incoming and Away Normal SG-06.R	   01:03:59:13	   01:04:01:22	   00:00:02:09	Unmuted
+2       	3       	Landrover Defender DRIVE Steady 4000 rpm INTERNAL-01.R	   01:04:05:21	   01:04:09:07	   00:00:03:15	Unmuted
+2       	4       	(cross fade)                  	   01:04:09:07	   01:04:13:08	   00:00:04:01	Unmuted
+2       	5       	Landrover Defender DRIVE Steady 4000 rpm INTERNAL-02.R	   01:04:13:08	   01:04:16:28	   00:00:03:19	Unmuted
+
+
+TRACK NAME:	Hummer H3 DRIVEBY Incoming and Away Normal SG (Stereo)
+COMMENTS:	
+USER DELAY:	0 Samples
+STATE: 
+PLUG-INS: 
+CHANNEL 	EVENT   	CLIP NAME                     	START TIME    	END TIME      	DURATION      	STATE
+1       	1       	Hummer H3 DRIVEBY Incoming and Away Normal SG-01.L	   01:03:56:04	   01:04:00:19	   00:00:04:14	Unmuted
+1       	2       	Hummer H3 DRIVEBY Incoming and Away Normal SG-07.L	   01:04:00:19	   01:04:08:09	   00:00:07:20	Unmuted
+1       	3       	(cross fade)                  	   01:04:08:09	   01:04:13:23	   00:00:05:13	Unmuted
+1       	4       	Hummer H3 DRIVEBY Incoming and Away Normal SG-08.L	   01:04:13:23	   01:04:21:02	   00:00:07:09	Unmuted
+1       	5       	(cross fade)                  	   01:04:21:02	   01:04:25:22	   00:00:04:19	Unmuted
+1       	6       	Hummer H3 DRIVEBY Incoming and Away Normal SG-05.L	   01:04:25:22	   01:04:30:13	   00:00:04:21	Unmuted
+1       	7       	(fade out)                    	   01:04:30:13	   01:04:30:27	   00:00:00:14	Unmuted
+
+
+2       	1       	Hummer H3 DRIVEBY Incoming and Away Normal SG-01.R	   01:03:56:04	   01:04:00:19	   00:00:04:14	Unmuted
+2       	2       	Hummer H3 DRIVEBY Incoming and Away Normal SG-07.R	   01:04:00:19	   01:04:08:09	   00:00:07:20	Unmuted
+2       	3       	(cross fade)                  	   01:04:08:09	   01:04:13:23	   00:00:05:13	Unmuted
+2       	4       	Hummer H3 DRIVEBY Incoming and Away Normal SG-08.R	   01:04:13:23	   01:04:21:02	   00:00:07:09	Unmuted
+2       	5       	(cross fade)                  	   01:04:21:02	   01:04:25:22	   00:00:04:19	Unmuted
+2       	6       	Hummer H3 DRIVEBY Incoming and Away Normal SG-05.R	   01:04:25:22	   01:04:30:13	   00:00:04:21	Unmuted
+2       	7       	(fade out)                    	   01:04:30:13	   01:04:30:27	   00:00:00:14	Unmuted
+
+
+TRACK NAME:	Hummer H3 DRIVEBY Kickdown Fast 01 OMNI (Stereo)
+COMMENTS:	
+USER DELAY:	0 Samples
+STATE: 
+PLUG-INS: 
+CHANNEL 	EVENT   	CLIP NAME                     	START TIME    	END TIME      	DURATION      	STATE
+1       	1       	(fade in)                     	   01:03:51:04	   01:04:05:23	   00:00:14:19	Unmuted
+1       	2       	Hummer H3 DRIVEBY Kickdown Fast 01 OMNI-01.L	   01:04:05:23	   01:04:09:11	   00:00:03:17	Unmuted
+1       	3       	(fade out)                    	   01:04:09:11	   01:04:24:15	   00:00:15:03	Unmuted
+
+
+2       	1       	(fade in)                     	   01:03:51:04	   01:04:05:23	   00:00:14:19	Unmuted
+2       	2       	Hummer H3 DRIVEBY Kickdown Fast 01 OMNI-01.R	   01:04:05:23	   01:04:09:11	   00:00:03:17	Unmuted
+2       	3       	(fade out)                    	   01:04:09:11	   01:04:24:15	   00:00:15:03	Unmuted
+
+
+M A R K E R S  L I S T I N G
+#   	LOCATION     	TIME REFERENCE    	UNITS    	NAME                             	TRACK NAME                       	TRACK TYPE   	COMMENTS
+1   	01:00:00:00  	172972800         	Samples  	FFOA                             	MARKERS1                         	Ruler                            	
+2   	01:10:29:12  	203214211         	Samples  	LFOA                             	MARKERS1                         	Ruler                            	
