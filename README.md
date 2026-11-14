@@ -1,5 +1,7 @@
 # aafton
 
+> **Pre-alpha.** The author is still testing `aafton` on real sessions. Do not rely on it for client work yet, and check every converted session against its source. Report problems in the issues of this repository.
+
 `aafton` converts post-production sound sessions between AAF, EDL (CMX 3600), Final Cut Pro 7 XML (xmeml), FCPXML, and Ableton Live 12 (`.als`). Clip positions are carried in samples; `aafton verify` compares the start and the end of every audio clip between the source and the Live set. It is designed for dialogue editing, conforming, Foley, and sound design exchange between Pro Tools, DaVinci Resolve, Adobe Premiere Pro, Final Cut Pro, and Live 12.
 
 The converter operates under a fail-closed design: if a session feature cannot be represented without loss, the operation stops with a non-zero exit code. Permissive mode (`--permissive`) can be enabled to generate partial output while logging all structural warnings and errors.
@@ -24,7 +26,13 @@ Once the package is on PyPI:
 pipx install aafton
 ```
 
-Until then, install it from a checkout of the repository:
+Until then, install it straight from GitHub:
+
+```bash
+pipx install "aafton[desktop] @ git+https://github.com/ntworm/aafton"
+```
+
+Or from a checkout of the repository:
 
 ```bash
 pipx install .
