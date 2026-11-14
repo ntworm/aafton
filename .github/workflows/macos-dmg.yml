@@ -1,0 +1,49 @@
+name: macOS DMG
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+jobs:
+  build-dmg:
+    runs-on: macos-14
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install desktop and build dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install ".[desktop]" pyinstaller
+
+      - name: Build desktop application
+        run: python scripts/build_desktop.py
+
+      - name: Create macOS DMG
+        run: |
+          VERSION=$(python -c "from pathlib import Path; ns = {}; exec(Path('src/aafton/__init__.py').read_text(encoding='utf-8'), ns); print(ns['__version__'])")
+          STAGING="build/dmg-staging"
+          DMG="dist/aafton-${VERSION}-macos.dmg"
+          rm -rf "${STAGING}" "${DMG}"
+          mkdir -p "${STAGING}"
+          cp -a "dist/aafton.app" "${STAGING}/aafton.app"
+          ln -s /Applications "${STAGING}/Applications"
+          hdiutil create -volname "aafton" -srcfolder "${STAGING}" -ov -format UDZO "${DMG}"
+          test -f "${DMG}"
+
+      - name: Upload DMG artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: aafton-macos-dmg
+          path: dist/aafton-*.dmg
+          if-no-files-found: error

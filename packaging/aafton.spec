@@ -27,6 +27,16 @@ SRC = REPO / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
+from aafton import __version__ as VERSION  # noqa: E402
+
+
+def _icon_path(platform_name: str, filename: str) -> str | None:
+    """Returns the icon path for the active platform when the file exists."""
+    if sys.platform != platform_name:
+        return None
+    icon = REPO / "resources" / "brand" / filename
+    return str(icon) if icon.is_file() else None
+
 
 def _data_files() -> list[tuple[str, str]]:
     """The data files of the package, at their paths inside the package.
@@ -66,6 +76,10 @@ def _analysis(entry: Path):
 
 def _program(pyz, scripts, name: str, console: bool):
     """One program of the folder; the binaries come later, with the COLLECT."""
+    extra = {}
+    win_icon = _icon_path("win32", "aafton.ico")
+    if win_icon is not None:
+        extra["icon"] = win_icon
     return EXE(
         pyz,
         scripts,
@@ -76,6 +90,7 @@ def _program(pyz, scripts, name: str, console: bool):
         strip=False,
         upx=False,
         console=console,
+        **extra,
     )
 
 
@@ -108,8 +123,18 @@ if sys.platform == "darwin":
     # On macOS the folder also travels in an application bundle; the bundle
     # wraps the whole folder, with the runtime, the data files and the
     # programs.
+    bundle_kwargs = {}
+    mac_icon = _icon_path("darwin", "aafton.icns")
+    if mac_icon is not None:
+        bundle_kwargs["icon"] = mac_icon
     app_bundle = BUNDLE(
         folder,
         name="aafton.app",
         bundle_identifier="io.github.ntworm.aafton",
+        version=VERSION,
+        info_plist={
+            "CFBundleShortVersionString": VERSION,
+            "NSHighResolutionCapable": True,
+        },
+        **bundle_kwargs,
     )
