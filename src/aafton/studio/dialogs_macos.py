@@ -8,23 +8,35 @@ from __future__ import annotations
 
 import subprocess
 
-# The extension the save dialog proposes when the filter has none of its own.
-DEFAULT_EXTENSION = "txt"
-
 
 def _escape_title(title: str) -> str:
     """Escapes the quotes and the backslashes of the AppleScript string."""
     return str(title).replace("\\", "\\\\").replace('"', '\\"')
 
 
-def build_script(kind: str, title: str, extensions: list[str]) -> str:
-    """Builds the AppleScript of the dialog by kind, title and extensions."""
+def _inicio(folder: str, name: str) -> str:
+    """O nome e a pasta que o dialogo de salvar oferece; vazio sem os dois."""
+    partes = ""
+    if name:
+        partes += f' default name "{_escape_title(name)}"'
+    if folder:
+        partes += f' default location (POSIX file "{_escape_title(folder)}")'
+    return partes
+
+
+def build_script(
+    kind: str, title: str, extensions: list[str], folder: str = "", name: str = ""
+) -> str:
+    """Builds the AppleScript of the dialog by kind, title and extensions.
+
+    The save dialog offers ``name`` in ``folder`` when they are given; without
+    them it offers no name. The extensions are kept for the open dialog.
+    """
     safe = _escape_title(title)
     if kind == "folder":
         chooser = f'choose folder with prompt "{safe}"'
     elif kind == "save_file":
-        ext = extensions[0] if extensions else DEFAULT_EXTENSION
-        chooser = f'choose file name with prompt "{safe}" default name "untitled.{ext}"'
+        chooser = f'choose file name with prompt "{safe}"{_inicio(folder, name)}'
     else:
         chooser = f'choose file with prompt "{safe}"'
     return f"POSIX path of ({chooser})"

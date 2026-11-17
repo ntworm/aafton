@@ -147,6 +147,8 @@ def _track_do_ltc(asset: MediaAsset, nome: str) -> TrackIR:
         channel_count=1,
     )
     track.raw = {"generated": MARCA}
+    # A track nasce muda: o LTC no Main e um chiado alto ate ser roteado.
+    track.muted = True
     clip = ClipIR(
         id="c_ltc",
         track_id=track.id,
@@ -279,14 +281,15 @@ def _avisa_track_escrita(
         "LTC_TRACK_WRITTEN",
         f"track {nome} generated from {rotulo} at the rate {chave}, "
         f"level {level_dbfs} dBFS: {caminho}. "
-        f"The track goes out through Main: route it to a dedicated physical output "
-        f"before playing",
+        f"The track is muted and goes out through Main: route it to a dedicated "
+        f"physical output and unmute it before playing",
         {
             "start": rotulo,
             "rate": chave,
             "level_dbfs": level_dbfs,
             "path": str(caminho),
             "output": "Main",
+            "muted": True,
         },
     )
 

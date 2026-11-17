@@ -16,6 +16,9 @@
   <div class="dir" role="tablist" aria-label="Direction">
     <button class="dir-tab" type="button" role="tab" id="tab-to-live" aria-controls="panel-to-live" aria-selected="true">AAF<span class="arrow" aria-hidden="true">&rarr;</span><span class="sr">to</span>Live</button>
     <button class="dir-tab" type="button" role="tab" id="tab-to-aaf" aria-controls="panel-to-aaf" aria-selected="false" tabindex="-1">Live<span class="arrow" aria-hidden="true">&rarr;</span><span class="sr">to</span>AAF</button>
+    <button class="dir-tab" type="button" role="tab" id="tab-pa" aria-controls="panel-pa" aria-selected="false" tabindex="-1">Production audio<span class="arrow" aria-hidden="true">&rarr;</span><span class="sr">to</span>Live</button>
+    <button class="dir-tab" type="button" role="tab" id="tab-collect" aria-controls="panel-collect" aria-selected="false" tabindex="-1">Collect media</button>
+    <button class="dir-tab" type="button" role="tab" id="tab-reconform" aria-controls="panel-reconform" aria-selected="false" tabindex="-1">Reconform</button>
   </div>
   <div class="bar-meta">v<span data-f="version"></span></div>
 </header>
@@ -34,6 +37,13 @@
         <div class="pick">
           <input class="path" type="text" data-f="input" spellcheck="false" autocomplete="off" placeholder="Path to the .aaf file" aria-label="Source file">
           <button class="btn" type="button" data-act="browse-input">Choose file&hellip;</button>
+        </div>
+        <div class="field">
+          <label for="a-production-audio">Production audio folder <span class="opt-mark">optional</span></label>
+          <div class="field-row">
+            <input class="path" type="text" id="a-production-audio" data-f="production_audio" spellcheck="false" autocomplete="off" placeholder="Folder of the recorder files">
+            <button class="btn" type="button" data-act="browse-production-audio">Choose folder&hellip;</button>
+          </div>
         </div>
         <div class="opts opts-inline" data-f="edl-rate-wrap" hidden>
           <div class="opt" role="radiogroup" aria-labelledby="a-k-edl">
@@ -69,6 +79,13 @@
       <div class="step-c">
         <div class="step-h"><h2>Tracks</h2><p class="hint">What the session holds and how each track converts.</p></div>
         <p class="placeholder" data-when="empty reading error">Tracks appear here once a file is read.</p>
+        <div class="view-switch" data-when="ready working done" data-f="org-view-switch" hidden>
+          <div class="segs" role="radiogroup" aria-label="Track view">
+            <label class="seg"><input type="radio" name="a-view" value="proposed" checked><span>Organized</span></label>
+            <label class="seg"><input type="radio" name="a-view" value="sent"><span>As sent</span></label>
+          </div>
+          <button class="btn btn-quiet reset" type="button" data-act="org-reset">Undo my edits</button>
+        </div>
         <table class="sheet" data-when="ready working done" data-f="tracks">
           <thead><tr>
             <th class="c-n" scope="col">#</th>
@@ -80,6 +97,19 @@
           </tr></thead>
           <tbody data-f="track-rows"></tbody>
         </table>
+        <table class="sheet" data-when="ready working done" data-f="org-tracks" data-colored="1" hidden>
+          <thead><tr>
+            <th class="c-pick" scope="col"></th>
+            <th class="c-sw" scope="col"></th>
+            <th class="c-name" scope="col">Track</th>
+            <th class="c-kind" scope="col">Channels</th>
+            <th class="c-clips" scope="col">Clips</th>
+            <th class="c-lane" scope="col"><div class="ruler" aria-label="Timeline"><span data-f="org-tc-start"></span><span data-f="org-tc-end"></span></div></th>
+            <th class="c-state" scope="col">From</th>
+          </tr></thead>
+          <tbody data-f="org-rows"></tbody>
+        </table>
+        <div class="sheet-foot" data-when="ready working done" data-f="siblings-foot" hidden><span>Indented tracks come from the recorder files: same cuts, fades and clip gain as the editor's clip, in a group named after the editor's track.</span></div>
         <div data-when="ready working done" data-f="notes-block" hidden>
           <h3 class="notes-h">Notes</h3>
           <ul class="notes" data-f="notes"></ul>
@@ -122,13 +152,41 @@
               <label class="seg"><input type="radio" name="a-fades" value="keep"><span>Keep rendered</span></label>
             </div>
           </div>
-          <div class="opt" role="radiogroup" aria-labelledby="a-k-groups">
-            <span class="opt-k" id="a-k-groups">Groups</span>
+          <div class="opt" role="radiogroup" aria-labelledby="a-k-organize">
+            <span class="opt-k" id="a-k-organize">Organize</span>
             <div class="segs">
-              <label class="seg"><input type="radio" name="a-groups" value="none" checked><span>Off</span></label>
-              <label class="seg"><input type="radio" name="a-groups" value="prefix"><span>By name prefix</span></label>
+              <label class="seg"><input type="radio" name="a-organize" value="off" checked><span>Off</span></label>
+              <label class="seg"><input type="radio" name="a-organize" value="prefix"><span>Name prefix</span></label>
+              <label class="seg"><input type="radio" name="a-organize" value="type"><span>By type</span></label>
             </div>
           </div>
+          <div class="opt" role="radiogroup" aria-labelledby="a-k-certainty" data-f="cert-wrap" hidden>
+            <span class="opt-k" id="a-k-certainty">Certainty</span>
+            <div class="segs">
+              <label class="seg"><input type="radio" name="a-certainty" value="permissive" checked><span>Permissive</span></label>
+              <label class="seg"><input type="radio" name="a-certainty" value="balanced"><span>Balanced</span></label>
+              <label class="seg"><input type="radio" name="a-certainty" value="strict"><span>Strict</span></label>
+            </div>
+          </div>
+        </div>
+        <p class="placeholder" data-f="cert-hint" hidden>Moves a clip on one signal. Fast, check the list.</p>
+
+        <details class="more" data-f="org-signals-wrap" hidden>
+          <summary>Organize signals</summary>
+          <div class="more-body sigs">
+            <label class="check"><input type="checkbox" data-sig="file" checked><span>File type (.r3d, .mov, .m4a, .mp3&hellip;)</span></label>
+            <label class="check"><input type="checkbox" data-sig="meta" checked><span>Recorder metadata (iXML, BWF)</span></label>
+            <label class="check"><input type="checkbox" data-sig="name" checked><span>Clip and file names (scene, take, OFF, camera roll)</span></label>
+            <label class="check"><input type="checkbox" data-sig="family" checked><span>Same naming means same group</span></label>
+            <label class="check"><input type="checkbox" data-sig="color" checked><span>Colour tracks and clips by type</span></label>
+          </div>
+        </details>
+
+        <div class="org-sum" data-f="org-sum" hidden>
+          <span data-f="org-sum-proposed" hidden><b data-f="sum-tracks">0</b> tracks in <b data-f="sum-groups">0</b> groups, renamed and coloured by type. <b data-f="sum-moved">0</b> clips change track to sit with their type. <b data-f="sum-stay">0</b> unsure clips stay where the editor put them.<span data-f="sum-edited-wrap" hidden> <b data-f="sum-edited">0</b> edited by hand.</span> Every clip keeps its sample position; verify checks it after writing.</span>
+          <span data-f="org-sum-sent" hidden>Showing the session as the editor sent it.</span>
+          <span data-f="org-sum-loading" hidden>Organizing tracks&hellip;</span>
+          <span data-f="org-sum-error" hidden></span>
         </div>
 
         <details class="more">
@@ -167,6 +225,8 @@
                 <button class="btn" type="button" data-act="browse-session-text">Choose&hellip;</button>
               </div>
             </div>
+            <label class="check"><input type="checkbox" data-f="collect_media" checked><span>Collect media next to the set</span></label>
+            <p class="placeholder">Copies every file the set uses into &lt;set name&gt; Media/ beside it.</p>
             <label class="check"><input type="checkbox" data-f="ltc"><span>Add an LTC track</span></label>
             <div class="opts">
               <div class="opt" role="radiogroup" aria-labelledby="a-k-mode">
@@ -251,9 +311,12 @@
         <div class="sheet-foot" data-when="ready working done"><span data-f="tracks-summary"></span></div>
         <div class="guide" data-f="guide" hidden>
           <h3>Render in Live first</h3>
-          <p>These tracks hold nothing an AAF can carry as they are. In Live, freeze and flatten them, save the set, then read it again.</p>
+          <p data-f="guide-text">These tracks hold nothing an AAF can carry as they are. In Live, freeze and flatten them, save the set, then read it again.</p>
           <ul data-f="guide-list"></ul>
-          <button class="btn" type="button" data-act="reread">Read again</button>
+          <div class="msg-a">
+            <button class="btn" type="button" data-act="reread">Read again</button>
+            <button class="btn btn-quiet" type="button" data-act="leave-out-render" hidden>Leave them out</button>
+          </div>
         </div>
         <div data-when="ready working done" data-f="notes-block" hidden>
           <h3 class="notes-h">Notes</h3>
@@ -279,6 +342,29 @@
           <div class="field-row">
             <input class="path" type="text" id="b-output" data-f="output" spellcheck="false" autocomplete="off" placeholder="Set after reading">
             <button class="btn" type="button" data-act="browse-output">Save as&hellip;</button>
+          </div>
+        </div>
+
+        <div class="start-wrap" data-f="start-wrap" hidden>
+          <div class="field">
+            <label for="b-start">Start timecode</label>
+            <div class="field-row">
+              <input class="path start-tc" type="text" id="b-start" data-f="start_tc" spellcheck="false" autocomplete="off" value="01:00:00:00">
+            </div>
+            <p class="placeholder">Where bar 1 of the set lands in the AAF.</p>
+          </div>
+
+          <div class="opts">
+            <div class="opt" role="radiogroup" aria-labelledby="b-k-fps">
+              <span class="opt-k" id="b-k-fps">Frame rate</span>
+              <div class="segs">
+                <label class="seg"><input type="radio" name="b-fps" value="23.976"><span>23.976</span></label>
+                <label class="seg"><input type="radio" name="b-fps" value="24" checked><span>24</span></label>
+                <label class="seg"><input type="radio" name="b-fps" value="25"><span>25</span></label>
+                <label class="seg"><input type="radio" name="b-fps" value="29.97"><span>29.97</span></label>
+                <label class="seg"><input type="radio" name="b-fps" value="30"><span>30</span></label>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -313,6 +399,8 @@
                 </div>
               </div>
             </div>
+            <label class="check"><input type="checkbox" data-f="collect_media" checked><span>Collect media next to the AAF</span></label>
+            <p class="placeholder">Copies every linked file into &lt;AAF name&gt; Media/ beside it. Only with Format AAF and Link files.</p>
             <p class="placeholder">Strict stops when something cannot be carried. Permissive writes the file and lists what was lost.</p>
           </div>
         </details>
@@ -339,6 +427,308 @@
             <button class="btn" type="button" data-act="reveal-output">Show in folder</button>
             <button class="btn" type="button" data-act="save-report">Save report&hellip;</button>
             <button class="btn" type="button" data-act="convert-permissive" hidden>Write anyway</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </aside>
+</section>
+
+<!-- ===================== Production audio to Live ===================== -->
+<section class="panel" id="panel-pa" role="tabpanel" aria-labelledby="tab-pa" data-direction="production" data-phase="empty" hidden>
+  <div class="col-main">
+  <fieldset class="set">
+
+    <div class="step">
+      <div class="step-n" aria-hidden="true">01</div>
+      <div class="step-c">
+        <div class="step-h"><h2>Source</h2><p class="hint">The recorder files: a folder with one subfolder per shooting day, or a single WAV.</p></div>
+        <div class="pick">
+          <input class="path" type="text" data-f="input" spellcheck="false" autocomplete="off" placeholder="Path to the recorder folder" aria-label="Recorder folder">
+          <button class="btn" type="button" data-act="browse-input">Choose folder&hellip;</button>
+        </div>
+        <p class="placeholder" data-when="empty">Broadcast WAV files of a field recorder, with or without iXML.</p>
+        <div class="working" data-when="reading" role="status"><span class="working-bar"></span><span class="working-text">Reading the recorder files&hellip;</span></div>
+        <p class="msg msg-error" data-when="error" data-f="read-error" role="alert"></p>
+        <dl class="facts" data-when="ready working done" data-f="facts"></dl>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-n" aria-hidden="true">02</div>
+      <div class="step-c">
+        <div class="step-h"><h2>Tracks</h2><p class="hint">One track per recorder input. Each day is a block, takes at their timecode.</p></div>
+        <p class="placeholder" data-when="empty reading error">Tracks appear here once the recorder files are read.</p>
+        <table class="sheet" data-when="ready working done" data-f="tracks">
+          <thead><tr>
+            <th class="c-n" scope="col">#</th>
+            <th class="c-name" scope="col">Track</th>
+            <th class="c-takes" scope="col">Takes</th>
+            <th class="c-clips" scope="col">Clips</th>
+            <th class="c-lane" scope="col"><div class="ruler-days" data-f="ruler" aria-label="Shooting days"></div></th>
+            <th class="c-state" scope="col">State</th>
+          </tr></thead>
+          <tbody data-f="track-rows"></tbody>
+        </table>
+        <div class="sheet-foot" data-when="ready working done"><span>Green clips are circled takes. A track named only <b>In N</b> had different mics on that input; each clip shows its mic.</span></div>
+        <div data-when="ready working done" data-f="notes-block" hidden>
+          <h3 class="notes-h">Notes</h3>
+          <ul class="notes" data-f="notes"></ul>
+          <details class="notes-more" data-f="notes-info-wrap" hidden>
+            <summary><span data-f="notes-info-count"></span></summary>
+            <ul class="notes" data-f="notes-info"></ul>
+          </details>
+        </div>
+      </div>
+    </div>
+
+  </fieldset>
+  </div>
+  <aside class="col-side">
+    <div class="step">
+      <div class="step-n" aria-hidden="true">03</div>
+      <div class="step-c">
+        <div class="step-h"><h2>Live set</h2></div>
+        <fieldset class="set">
+        <div class="field">
+          <label for="c-output">Destination</label>
+          <div class="field-row">
+            <input class="path" type="text" id="c-output" data-f="output" spellcheck="false" autocomplete="off" placeholder="Set after reading">
+            <button class="btn" type="button" data-act="browse-output">Save as&hellip;</button>
+          </div>
+        </div>
+
+        <details class="more" open>
+          <summary>More options</summary>
+          <div class="more-body">
+            <label class="check"><input type="checkbox" data-f="circled_only"><span>Circled takes only</span></label>
+            <div class="field">
+              <label for="c-template">Live template</label>
+              <div class="field-row">
+                <input class="path" type="text" id="c-template" data-f="template" spellcheck="false" autocomplete="off" placeholder="Built-in template">
+                <button class="btn" type="button" data-act="browse-template">Choose&hellip;</button>
+              </div>
+            </div>
+            <div class="field">
+              <label for="c-bpm">Tempo (BPM)</label>
+              <input class="path" type="text" inputmode="decimal" id="c-bpm" data-f="bpm" value="60">
+            </div>
+          </div>
+        </details>
+        </fieldset>
+
+        <div class="go">
+          <button class="btn btn-primary" type="button" data-act="convert" disabled>Convert</button>
+          <div class="working" data-when="working" role="status"><span class="working-bar"></span><span class="working-text">Converting&hellip;</span></div>
+          <p class="msg msg-error" data-f="convert-error" role="alert" hidden></p>
+          <div class="msg msg-warn" data-f="exists" hidden>
+            <span>This file already exists. Writing again replaces it.</span>
+            <div class="msg-a">
+              <button class="btn" type="button" data-act="convert-replace">Replace</button>
+              <button class="btn btn-quiet" type="button" data-act="cancel-replace">Cancel</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="verdict" data-when="done" data-f="verdict" data-state="ok" role="status" aria-live="polite">
+          <div class="verdict-k">Verification</div>
+          <div class="verdict-w" data-f="verdict-word"></div>
+          <div class="verdict-d" data-f="verdict-detail"></div>
+          <div class="verdict-a">
+            <button class="btn" type="button" data-act="open-output">Open in Live</button>
+            <button class="btn" type="button" data-act="reveal-output">Show in folder</button>
+            <button class="btn" type="button" data-act="save-report">Save report&hellip;</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </aside>
+</section>
+
+<!-- ===================== Collect media ===================== -->
+<section class="panel" id="panel-collect" role="tabpanel" aria-labelledby="tab-collect" data-direction="collect" data-phase="empty" hidden>
+  <div class="col-main">
+  <fieldset class="set">
+    <div class="step">
+      <div class="step-n" aria-hidden="true">01</div>
+      <div class="step-c">
+        <div class="step-h"><h2>Source</h2><p class="hint">The Live set or the linked AAF to collect. It is only read, never changed.</p></div>
+        <div class="pick">
+          <input class="path" type="text" data-f="input" spellcheck="false" autocomplete="off" placeholder="Path to the .als or .aaf file" aria-label="Source file">
+          <button class="btn" type="button" data-act="browse-input">Choose file&hellip;</button>
+        </div>
+        <p class="placeholder" data-when="empty">An Ableton Live set (.als) or a linked AAF (.aaf).</p>
+        <div class="working" data-when="reading" role="status"><span class="working-bar"></span><span class="working-text">Reading the session&hellip;</span></div>
+        <p class="msg msg-error" data-when="error" data-f="read-error" role="alert"></p>
+        <dl class="facts" data-when="ready working done" data-f="facts"></dl>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-n" aria-hidden="true">02</div>
+      <div class="step-c">
+        <div class="step-h"><h2>Media</h2><p class="hint">Every file the session uses, and what happens to it.</p></div>
+        <p class="placeholder" data-when="empty reading error">Media files appear here once a session is read.</p>
+        <table class="sheet" data-when="ready working done" data-f="tracks">
+          <thead><tr>
+            <th class="c-n" scope="col">#</th>
+            <th class="c-name" scope="col">File</th>
+            <th class="c-kind" scope="col">Kind</th>
+            <th class="c-clips" scope="col">Size</th>
+            <th class="c-from" scope="col">Folder</th>
+            <th class="c-state" scope="col">State</th>
+          </tr></thead>
+          <tbody data-f="track-rows"></tbody>
+        </table>
+        <div class="sheet-foot" data-when="ready working done"><span data-f="collect-foot"></span></div>
+        <div data-when="ready working done" data-f="notes-block" hidden>
+          <h3 class="notes-h">Notes</h3>
+          <ul class="notes" data-f="notes"></ul>
+          <details class="notes-more" data-f="notes-info-wrap" hidden>
+            <summary><span data-f="notes-info-count"></span></summary>
+            <ul class="notes" data-f="notes-info"></ul>
+          </details>
+        </div>
+      </div>
+    </div>
+  </fieldset>
+  </div>
+  <aside class="col-side">
+    <div class="step">
+      <div class="step-n" aria-hidden="true">03</div>
+      <div class="step-c">
+        <div class="step-h"><h2>Destination</h2></div>
+        <fieldset class="set">
+        <div class="field">
+          <label for="c-dest">Folder</label>
+          <div class="field-row">
+            <input class="path" type="text" id="c-dest" data-f="output" spellcheck="false" autocomplete="off" placeholder="Set after reading">
+            <button class="btn" type="button" data-act="browse-output">Choose folder&hellip;</button>
+          </div>
+        </div>
+        <p class="placeholder" data-f="collect-dest-hint">The folder gets the session copy and its Media/ folder. It must be empty.</p>
+        <label class="check"><input type="checkbox" data-f="include_video" checked><span>Include picture</span></label>
+        </fieldset>
+        <div class="go">
+          <button class="btn btn-primary" type="button" data-act="convert" disabled>Collect</button>
+          <div class="working" data-when="working" role="status"><span class="working-bar"></span><span class="working-text">Copying media&hellip;</span></div>
+          <p class="msg msg-error" data-f="convert-error" role="alert" hidden></p>
+        </div>
+        <div class="verdict" data-when="done" data-f="verdict" data-state="ok" role="status" aria-live="polite">
+          <div class="verdict-k">Collection</div>
+          <div class="verdict-w" data-f="verdict-word"></div>
+          <div class="verdict-d" data-f="verdict-detail"></div>
+          <div class="verdict-a">
+            <button class="btn" type="button" data-act="open-output">Open in Live</button>
+            <button class="btn" type="button" data-act="reveal-output">Show in folder</button>
+            <button class="btn" type="button" data-act="save-report">Save report&hellip;</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </aside>
+</section>
+
+<!-- ===================== Reconform ===================== -->
+<section class="panel" id="panel-reconform" role="tabpanel" aria-labelledby="tab-reconform" data-direction="reconform" data-phase="empty" hidden>
+  <div class="col-main">
+  <fieldset class="set">
+    <div class="step">
+      <div class="step-n" aria-hidden="true">01</div>
+      <div class="step-c">
+        <div class="step-h"><h2>Cuts</h2><p class="hint">The old and the new picture cut. They are only read.</p></div>
+        <div class="pick">
+          <input class="path" type="text" data-f="input" spellcheck="false" autocomplete="off" placeholder="Path to the old cut" aria-label="Old cut">
+          <button class="btn" type="button" data-act="browse-input">Old cut&hellip;</button>
+        </div>
+        <div class="pick">
+          <input class="path" type="text" data-f="new_cut" spellcheck="false" autocomplete="off" placeholder="Path to the new cut" aria-label="New cut">
+          <button class="btn" type="button" data-act="browse-new-cut">New cut&hellip;</button>
+        </div>
+        <div class="opts opts-inline" data-f="r-edl-wrap" hidden>
+          <div class="opt" role="radiogroup" aria-labelledby="r-k-edl">
+            <span class="opt-k" id="r-k-edl">Frame rate</span>
+            <div class="segs">
+              <label class="seg"><input type="radio" name="r-edl-rate" value="23.976"><span>23.976</span></label>
+              <label class="seg"><input type="radio" name="r-edl-rate" value="24"><span>24</span></label>
+              <label class="seg"><input type="radio" name="r-edl-rate" value="25"><span>25</span></label>
+              <label class="seg"><input type="radio" name="r-edl-rate" value="29.97"><span>29.97</span></label>
+              <label class="seg"><input type="radio" name="r-edl-rate" value="29.97df"><span>29.97 DF</span></label>
+              <label class="seg"><input type="radio" name="r-edl-rate" value="30"><span>30</span></label>
+            </div>
+          </div>
+        </div>
+        <p class="placeholder" data-when="empty">EDL (CMX 3600), Final Cut Pro 7 XML or AAF. An EDL needs its frame rate, or a set made by aafton.</p>
+        <div class="working" data-when="reading" role="status"><span class="working-bar"></span><span class="working-text">Comparing the cuts&hellip;</span></div>
+        <p class="msg msg-error" data-when="error" data-f="read-error" role="alert"></p>
+        <dl class="facts" data-when="ready working done" data-f="facts"></dl>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-n" aria-hidden="true">02</div>
+      <div class="step-c">
+        <div class="step-h"><h2>Changes</h2><p class="hint">What moved, came in, left and changed length, in the timecode of each cut.</p></div>
+        <p class="placeholder" data-when="empty reading error">The change list appears here once both cuts are read.</p>
+        <table class="sheet" data-when="ready working done" data-f="tracks">
+          <thead><tr>
+            <th class="c-n" scope="col">#</th>
+            <th class="c-kind" scope="col">Change</th>
+            <th class="c-clips" scope="col">Old</th>
+            <th class="c-clips" scope="col">New</th>
+            <th class="c-clips" scope="col">Frames</th>
+            <th class="c-from" scope="col">Source</th>
+            <th class="c-state" scope="col">Detail</th>
+          </tr></thead>
+          <tbody data-f="track-rows"></tbody>
+        </table>
+        <div class="sheet-foot" data-when="ready working done"><span data-f="reconform-foot"></span></div>
+        <div data-when="ready working done" data-f="notes-block" hidden>
+          <h3 class="notes-h">Notes</h3>
+          <ul class="notes" data-f="notes"></ul>
+          <details class="notes-more" data-f="notes-info-wrap" hidden>
+            <summary><span data-f="notes-info-count"></span></summary>
+            <ul class="notes" data-f="notes-info"></ul>
+          </details>
+        </div>
+      </div>
+    </div>
+  </fieldset>
+  </div>
+  <aside class="col-side">
+    <div class="step">
+      <div class="step-n" aria-hidden="true">03</div>
+      <div class="step-c">
+        <div class="step-h"><h2>Live set</h2></div>
+        <fieldset class="set">
+        <div class="field">
+          <label for="r-set">Set</label>
+          <div class="field-row">
+            <input class="path" type="text" id="r-set" data-f="set" spellcheck="false" autocomplete="off" placeholder="The set of the old cut">
+            <button class="btn" type="button" data-act="browse-set">Choose set&hellip;</button>
+          </div>
+        </div>
+        <div class="field">
+          <label for="r-dest">Copy</label>
+          <div class="field-row">
+            <input class="path" type="text" id="r-dest" data-f="output" spellcheck="false" autocomplete="off" placeholder="Set after choosing the set">
+            <button class="btn" type="button" data-act="browse-output">Save as&hellip;</button>
+          </div>
+        </div>
+        <p class="placeholder">The set is never changed. The copy goes in the folder of the set; what left the cut goes to muted [saiu] tracks.</p>
+        <label class="check"><input type="checkbox" data-f="apply" checked><span>Conform the copy to the new cut</span></label>
+        </fieldset>
+        <div class="go">
+          <button class="btn btn-primary" type="button" data-act="convert" disabled>Reconform</button>
+          <div class="working" data-when="working" role="status"><span class="working-bar"></span><span class="working-text">Conforming the set&hellip;</span></div>
+          <p class="msg msg-error" data-f="convert-error" role="alert" hidden></p>
+        </div>
+        <div class="verdict" data-when="done" data-f="verdict" data-state="ok" role="status" aria-live="polite">
+          <div class="verdict-k">Reconform</div>
+          <div class="verdict-w" data-f="verdict-word"></div>
+          <div class="verdict-d" data-f="verdict-detail"></div>
+          <div class="verdict-a">
+            <button class="btn" type="button" data-act="open-output">Open in Live</button>
+            <button class="btn" type="button" data-act="reveal-output">Show in folder</button>
+            <button class="btn" type="button" data-act="save-report">Save report&hellip;</button>
           </div>
         </div>
       </div>
@@ -383,11 +773,59 @@
 
 <template id="tpl-clip"><tr><td data-f="name"></td><td data-f="in"></td><td data-f="out"></td><td class="num" data-f="gain"></td><td data-f="fades"></td></tr></template>
 
+<template id="tpl-track-production"><tr class="row">
+  <td class="c-n" data-f="n"></td>
+  <td class="c-name"><button class="name" type="button" aria-expanded="false"><span data-f="name"></span></button></td>
+  <td class="c-takes" data-f="takes"></td>
+  <td class="c-clips" data-f="clips"></td>
+  <td class="c-lane"><canvas class="lane" data-f="lane" height="16"></canvas></td>
+  <td class="c-state"><span class="st" data-f="state"></span></td>
+</tr></template>
+
+<template id="tpl-detail-production"><tr class="detail"><td>
+  <ul class="reasons" data-f="reasons" hidden></ul>
+  <div class="clips-wrap clips-days" data-f="clips-wrap">
+    <table class="clips">
+      <thead><tr><th scope="col">Clip</th><th scope="col">Day</th><th scope="col">TC in</th><th scope="col">TC out</th><th scope="col">Circled</th></tr></thead>
+      <tbody data-f="clip-rows"></tbody>
+    </table>
+  </div>
+</td></tr></template>
+
+<template id="tpl-clip-production"><tr><td><span data-f="name"></span> <span class="mic" data-f="mic"></span></td><td data-f="day"></td><td data-f="tc_in"></td><td data-f="tc_out"></td><td><span class="circ" data-f="circled"></span></td></tr></template>
+
+<template id="tpl-track-collect"><tr class="row">
+  <td class="c-n" data-f="n"></td>
+  <td class="c-name"><span data-f="name"></span></td>
+  <td class="c-kind" data-f="kind"></td>
+  <td class="c-clips" data-f="size"></td>
+  <td class="c-from" data-f="folder"></td>
+  <td class="c-state"><span class="st" data-f="state"></span></td>
+</tr></template>
+
+<template id="tpl-track-reconform"><tr class="row">
+  <td class="c-n" data-f="n"></td>
+  <td class="c-kind" data-f="kind"></td>
+  <td class="c-clips" data-f="old"></td>
+  <td class="c-clips" data-f="new"></td>
+  <td class="c-clips" data-f="delta"></td>
+  <td class="c-from" data-f="source"></td>
+  <td class="c-state"><span class="st" data-f="state"></span></td>
+</tr></template>
+
 <template id="tpl-note"><li class="note"><span class="note-sev" data-f="sev"></span><span class="note-code"><span data-f="code"></span> <i data-f="count"></i></span><span class="note-text" data-f="text"></span></li></template>
 
 <template id="tpl-item"><li data-f="text"></li></template>
 
 <template id="tpl-line"><span data-f="text"></span></template>
+
+<template id="tpl-org-divider"><tr class="row-div"><td colspan="7"><b>Grouped by file name</b> &middot; aafton could not tell what these are, so files with the same name go together. Name each group after what it holds, or untick it to leave the clips where they are.</td></tr></template>
+
+<template id="tpl-org-group"><tr class="row-g"><td class="c-pick"><input type="checkbox" data-f="pick" checked></td><td class="c-sw"><span class="sw" data-f="sw"></span></td><td class="c-name gname" colspan="2"><span data-f="glabel"></span><input class="tname gin" type="text" data-f="gname" title="Name this group"></td><td class="c-clips gmeta" data-f="clips"></td><td class="c-lane gmeta" data-f="tracks-count"></td><td class="c-state"></td></tr></template>
+
+<template id="tpl-org-track"><tr class="row row-t"><td class="c-pick"><input type="checkbox" data-f="pick" checked></td><td class="c-sw"><span class="sw" data-f="sw"></span></td><td class="c-name"><div class="tname-wrap"><button class="name" type="button" aria-expanded="false" data-f="expand"><span data-f="label"></span></button><input class="tname" type="text" data-f="tname"></div></td><td class="c-kind" data-f="kind"></td><td class="c-clips" data-f="clips"></td><td class="c-lane"><canvas class="lane" data-f="lane" height="16"></canvas></td><td class="c-state from" data-f="from"></td></tr></template>
+
+<template id="tpl-org-clip"><tr class="row-c" data-on="1"><td class="c-pick"><input type="checkbox" data-f="pick" checked></td><td class="c-sw"></td><td class="c-name" colspan="2" data-f="name"></td><td class="c-clips"><span class="dots"><b data-f="dots-on"></b><span data-f="dots-off"></span></span></td><td class="c-lane why" data-f="why"></td><td class="c-state from"><span data-f="from"></span><span class="edited" data-f="edited" hidden>edited</span></td></tr></template>
 
 <script>
 /*__STUDIO_JS__*/

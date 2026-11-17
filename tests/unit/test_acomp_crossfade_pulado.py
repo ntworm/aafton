@@ -1,10 +1,8 @@
-"""Clip que fica fora do AAF quando a transicao conflita com a automacao.
+"""Crossfade com automacao de ganho dentro do overlap.
 
-Quando a automacao segmentada impede a Transition, o clip seguinte do par nao
-cabe no AAF: o preflight so dizia WRITE_FADE_UNSUPPORTED, como se o clip
-tivesse sido escrito sem o fade. Agora o relatorio diz WRITE_CLIP_SKIPPED, com
-o nome do clip e da track, e o fade do clip que nao foi escrito nao vira erro
-de fade: o fade-out do clip anterior continua como envelope de ganho.
+O writer grava cada clip inteiro com o proprio envelope de ganho, entao a
+automacao dentro do overlap nao impede a Transition: nenhum clip fica fora do
+AAF (antes de 16/11/2026 o clip seguinte saia com WRITE_CLIP_SKIPPED).
 """
 
 from aafton.aaf_write import write_aaf
@@ -34,22 +32,18 @@ def _escrever(tmp_path, nome, gain_points=None):
     return relatorio, destino
 
 
-def test_transicao_conflitante_reporta_o_clip_pulado(tmp_path):
-    """O clip que nao entra no AAF e nomeado no relatorio."""
+def test_automacao_no_overlap_nao_deixa_clip_fora(tmp_path):
+    """Os dois clips entram no AAF com a Transition entre eles."""
     relatorio, destino = _escrever(tmp_path, "conflito", [(ORIGEM + 1600, 1.0)])
 
-    pulados = [i for i in relatorio.issues if i.code == "WRITE_CLIP_SKIPPED"]
-    assert len(pulados) == 1
-    assert pulados[0].severity == "warning"
-    assert pulados[0].context["clip"] == "a2.wav"
-    assert pulados[0].context["track"] == "AUDIO 1"
-
-    fades = [i for i in relatorio.issues if i.code == "WRITE_FADE_UNSUPPORTED"]
-    assert [i.context["clip"] for i in fades] == ["a1.wav"]
+    codigos = [i.code for i in relatorio.issues]
+    assert "WRITE_CLIP_SKIPPED" not in codigos
+    assert "WRITE_FADE_UNSUPPORTED" not in codigos
 
     dados = _slots_de_audio(destino)[0][1]
-    assert dados["tipos"] == ["OperationGroup"]
-    assert dados["envelopes"] == 1
+    tipos = [t for t in dados["tipos"] if t != "Filler"]
+    assert tipos.count("Transition") == 1
+    assert len(tipos) == 3
 
 
 def test_transicao_sem_conflito_nao_reporta_clip_pulado(tmp_path):

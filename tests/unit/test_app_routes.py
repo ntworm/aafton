@@ -320,7 +320,10 @@ def test_um_arquivo_que_nao_existe_responde_com_200(studio_server, tmp_path):
     assert status == 200
     assert body["ok"] is False
     assert body["error"]["code"] == "not_found"
-    assert body["error"]["message"] == f"The file {tmp_path / 'nao_existe.aaf'} was not found."
+    assert body["error"]["message"] == (
+        f"nao_existe.aaf is no longer at {tmp_path}. It may have been moved, renamed or "
+        "deleted. Choose the file again."
+    )
 
 
 @pytest.mark.skipif(not TEMPLATE.exists(), reason="o template do Live nao esta no repositorio")

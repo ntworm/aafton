@@ -38,6 +38,7 @@ from tests.unit.test_als_crossfade import (
     _clips_do_als,
     _editar,
     _escrever,
+    _forma_v2,
     _sessao,
     _sessao_da_cadeia,
     _sessao_do_par,
@@ -230,11 +231,11 @@ def test_fade_escalado_nao_reimpoe_o_comprimento_do_ir(tmp_path):
     _sem_extensao(lido, ORIGEM + DURACAO)
 
 
-def test_fade_in_que_nao_cabe_na_duracao_visual_nao_vira_crossfade(tmp_path):
-    """O fade in e o fade out cabem no clip do IR, mas nao no clip aparado.
+def test_fade_in_que_cabe_no_clip_que_sai_vira_crossfade(tmp_path):
+    """O fade in e o fade out cabem no clip do IR, e o clip que sai nao e aparado.
 
-    O clip que sai e aparado na juncao: sobra 72000 samples de duracao visual
-    e o fade in, com 60000, ja nao deixa lugar para o crossfade de 24000.
+    Na forma medida o clip que sai fica com o fim do AAF: o fade in de 60000 e
+    o crossfade de 24000 cabem nos 96000 dele, e a volta e a do AAF.
     """
     wav = _wav_pcm(tmp_path / "fonte.wav", SR, SR * 4)
     clip_a = _clip(
@@ -257,11 +258,16 @@ def test_fade_in_que_nao_cabe_na_duracao_visual_nao_vira_crossfade(tmp_path):
     node_a, node_b = _clips_do_als(destino)
     # Os fades nao foram escalados: o IR comportava os dois.
     assert float(get_value(node_a, "Fades/FadeOutLength")) == pytest.approx(0.5)
-    assert get_value(node_b, "Fades/CrossfadeInState") == "0"
-    assert get_value(node_a, "CurrentEnd") != get_value(node_b, "CurrentStart")
+    assert get_value(node_b, "Fades/CrossfadeInState") == "1"
+    assert get_value(node_a, "CurrentEnd") == get_value(node_b, "CurrentStart")
 
     lido = read_session(destino, Report())
-    _sem_extensao(lido, ORIGEM + DURACAO)
+    assert _geometria(lido) == [
+        (ORIGEM, ORIGEM + DURACAO),
+        (ORIGEM + DURACAO - CROSSFADE, ORIGEM + DURACAO - CROSSFADE + DURACAO),
+    ]
+    clip_a = lido.tracks[0].clips[0]
+    assert clip_a.fade_in is not None and clip_a.fade_in.duration_samples == 60000
 
 
 # --- O leitor so estende com todas as provas --------------------------------
@@ -291,7 +297,8 @@ def test_fade_in_do_que_entra_nao_zerado_nao_estende_a_geometria(tmp_path, valor
     _editar(destino, mexer)
 
     lido = read_session(destino, Report())
-    _sem_extensao(lido, ORIGEM + DURACAO - CROSSFADE)
+    _sem_extensao(lido, ORIGEM + DURACAO)
+    assert lido.tracks[0].clips[1].timeline_start_samples == ORIGEM + DURACAO
     assert lido.tracks[0].clips[1].fade_in is None
 
 
@@ -311,20 +318,22 @@ def test_fades_desligados_no_que_entra_nao_estendem_a_geometria(tmp_path):
     _editar(destino, mexer)
 
     lido = read_session(destino, Report())
-    _sem_extensao(lido, ORIGEM + DURACAO - CROSSFADE)
+    _sem_extensao(lido, ORIGEM + DURACAO)
+    assert lido.tracks[0].clips[1].timeline_start_samples == ORIGEM + DURACAO
     assert lido.tracks[0].clips[1].fade_in is None
 
 
 @pytest.mark.parametrize("marcador", ["inf", "-inf", "nan", "1e308", "abc"])
 def test_out_marker_invalido_nao_extende_a_geometria(tmp_path, marcador):
-    """Um OutMarker que nao e numero nao prova material nenhum.
+    """Um OutMarker que nao e numero nao prova material nenhum na versao 2.
 
-    Infinito, NaN e um numero tao grande que estoura a conversao para inteiro
-    abortavam a leitura ou inventavam geometria: o leitor recusa o par e a
-    geometria antiga fica como esta.
+    Infinito, NaN e um numero tao grande que estoura a conversao abortavam a
+    leitura ou inventavam geometria: o leitor recusa o par e a geometria antiga
+    fica como esta.
     """
     wav = _wav_pcm(tmp_path / "fonte.wav", SR, SR * 4)
     destino = _escrever(tmp_path, _sessao_do_par(wav))
+    _forma_v2(destino)
 
     def mexer(root):
         clip_a = root.findall(

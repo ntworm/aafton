@@ -6,6 +6,7 @@ from aafton.als_write import WriteOptions, write_session
 from aafton.ir import ClipIR, MediaAsset, SessionIR, TrackIR
 from aafton.report import Report
 from aafton.sidecar import (
+    SIDECAR_FORMAT_VERSION,
     Anchor,
     read_anchor,
     sidecar_path_for,
@@ -52,13 +53,15 @@ def test_write_sidecar_v2_format_and_track_bindings(tmp_path):
     sidecar_file = sidecar_path_for(destino)
     assert sidecar_file.exists()
 
+    # O arquivo sai na versao que o codigo grava agora, mesmo com a ancora lida
+    # de um set de versao 2.
     dados = json.loads(sidecar_file.read_text(encoding="utf-8"))
-    assert dados["format_version"] == 2
+    assert dados["format_version"] == SIDECAR_FORMAT_VERSION == 3
     assert dados["track_bindings"] == bindings
     assert dados["media_hashes"] == hashes
 
     lido = read_anchor(destino)
-    assert lido.format_version == 2
+    assert lido.format_version == 3
     assert lido.track_bindings == bindings
     assert lido.media_hashes == hashes
 
@@ -160,7 +163,7 @@ def test_write_session_produces_v2_sidecar_with_bindings_and_hashes(tmp_path):
     )
 
     sidecar_data = json.loads(sidecar_path_for(destino).read_text(encoding="utf-8"))
-    assert sidecar_data["format_version"] == 2
+    assert sidecar_data["format_version"] == 3
     assert "track_bindings" in sidecar_data
     bindings = sidecar_data["track_bindings"]
     assert len(bindings) == 2

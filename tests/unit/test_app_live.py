@@ -122,7 +122,10 @@ def test_arquivo_que_nao_existe_e_formato_desconhecido_dao_erro(tmp_path):
     sumiu = app_read.read_source({"direction": "to_live", "input": str(sumiu_path)})
     assert sumiu["ok"] is False
     assert sumiu["error"]["code"] == "not_found"
-    assert sumiu["error"]["message"] == f"The file {sumiu_path} was not found."
+    assert sumiu["error"]["message"] == (
+        f"{sumiu_path.name} is no longer at {sumiu_path.parent}. "
+        "It may have been moved, renamed or deleted. Choose the file again."
+    )
 
     outro = tmp_path / "notas.txt"
     outro.write_text("oi", encoding="utf-8")
@@ -358,7 +361,10 @@ def test_a_fonte_que_nao_existe_da_erro_de_not_found(tmp_path):
 
     assert resultado["ok"] is False
     assert resultado["error"]["code"] == "not_found"
-    assert resultado["error"]["message"] == f"The file {fonte} was not found."
+    assert resultado["error"]["message"] == (
+        f"{fonte.name} is no longer at {fonte.parent}. "
+        "It may have been moved, renamed or deleted. Choose the file again."
+    )
     assert not (tmp_path / "saida.als").exists()
 
 

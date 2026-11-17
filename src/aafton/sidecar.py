@@ -17,11 +17,31 @@ from pathlib import Path
 from .timecode import TimecodeRate, label_to_samples, samples_to_label
 
 SIDECAR_SUFFIX = ".aafton.json"
+# Versao que este codigo grava. A 3 marca a forma medida do crossfade no Live
+# (o clip que entra comeca no fim do que sai); a leitura das versoes <= 2 fica
+# como era.
+SIDECAR_FORMAT_VERSION = 3
 _ANCHOR_NAME_RE = re.compile(r"^TC\s+(\d{2}:\d{2}:\d{2}[:;]\d{2})")
 
 
-class SidecarMissingError(RuntimeError):
-    """Nao foi possivel descobrir a ancoragem do arquivo."""
+class SidecarMissingError(RuntimeError, ValueError):
+    """Nao foi possivel descobrir a ancoragem do arquivo.
+
+    Tambem e ``ValueError``: a linha de comando mostra a mensagem, sem traceback.
+    """
+
+
+# Mensagem da recusa de volta de um set de som direto.
+PRODUCTION_SET_MESSAGE = "Sets built from production audio cannot be exported back yet"
+
+
+class ProductionSetError(ValueError):
+    """O set foi montado de som direto: a volta para AAF ainda nao existe."""
+
+    code = "production_set"
+
+    def __init__(self, message: str = PRODUCTION_SET_MESSAGE) -> None:
+        super().__init__(message)
 
 
 @dataclass(kw_only=True)
@@ -31,7 +51,8 @@ class Anchor:
     sample_rate: int
     timecode_rate: TimecodeRate
     bpm: float
-    format_version: int = 2
+    # Versao do set lido; um set sem sidecar vale como a atual.
+    format_version: int = SIDECAR_FORMAT_VERSION
     source_path: str | None = None
     fades: str = "absorb"
     stereo: str = "pair"
@@ -42,12 +63,21 @@ class Anchor:
     # Intervalos absolutos [inicio, fim) de cada clip escrito, por track do Live,
     # na ordem das tracks. O auditor de audio usa so os fins (--release-mask, D14).
     clip_ranges: list[dict] | None = None
+    # Chaves de origem [source_index, ordem] de cada clip escrito nas sessoes
+    # organizadas por tipo, na ordem das tracks do .als.
+    clip_origins: list[dict] | None = None
     # track_bindings: metadados deterministas por track do Live.
     # Campos base: index, track_name, origin_slot_id, mob_id, channel_count.
     # Campos multicanal (expansao sob GroupTrack): channel_index, multichannel_layout, parent_group.
     track_bindings: list[dict] | None = None
     media_hashes: dict[str, str] | None = None
     origin_slots: list[dict] | dict | None = None
+    # Som direto: layout da sessao e os blocos das diarias; None num set de AAF.
+    layout: str | None = None
+    blocks: list[dict] | None = None
+    # Expansao de canais: pasta do gravador, AAF do editor e, por irma (pelo
+    # nome da track), a marca e o original e a entrada de cada clip.
+    expanded: dict | None = None
 
 
 def sidecar_path_for(als_path: str | Path) -> Path:
@@ -55,10 +85,32 @@ def sidecar_path_for(als_path: str | Path) -> Path:
     return path.with_name(path.stem + SIDECAR_SUFFIX)
 
 
+# Campos gravados so quando existem, na ordem em que saem no arquivo.
+_CAMPOS_OPCIONAIS = (
+    "track_channels",
+    "audio_source_indices",
+    "clip_ranges",
+    "clip_origins",
+    "track_bindings",
+    "media_hashes",
+    "origin_slots",
+)
+
+
+def resolve_video_path(anchor_video_path: str, set_path: Path) -> Path:
+    """Resolve o video do sidecar: absoluto fica; relativo resolve a partir do set."""
+    caminho = Path(anchor_video_path)
+    if caminho.is_absolute():
+        return caminho
+    return (Path(set_path).resolve().parent / caminho).resolve()
+
+
 def write_sidecar(als_path: str | Path, anchor: Anchor) -> Path:
     destino = sidecar_path_for(als_path)
+    # O arquivo sai sempre na versao que este codigo grava, qualquer que seja a
+    # versao lida guardada na ancora.
     payload = {
-        "format_version": anchor.format_version,
+        "format_version": SIDECAR_FORMAT_VERSION,
         "sample_rate": anchor.sample_rate,
         "bpm": anchor.bpm,
         "timecode_rate": {
@@ -80,20 +132,33 @@ def write_sidecar(als_path: str | Path, anchor: Anchor) -> Path:
         "video_path": anchor.video_path,
         "video_anchor_source": anchor.video_anchor_source,
     }
-    if anchor.track_channels is not None:
-        payload["track_channels"] = anchor.track_channels
-    if anchor.audio_source_indices is not None:
-        payload["audio_source_indices"] = anchor.audio_source_indices
-    if anchor.clip_ranges is not None:
-        payload["clip_ranges"] = anchor.clip_ranges
-    if anchor.track_bindings is not None:
-        payload["track_bindings"] = anchor.track_bindings
-    if anchor.media_hashes is not None:
-        payload["media_hashes"] = anchor.media_hashes
-    if anchor.origin_slots is not None:
-        payload["origin_slots"] = anchor.origin_slots
+    for campo in _CAMPOS_OPCIONAIS:
+        valor = getattr(anchor, campo)
+        if valor is not None:
+            payload[campo] = valor
+    if anchor.layout is not None:
+        payload["layout"] = anchor.layout
+        payload["blocks"] = anchor.blocks or []
+    if anchor.expanded is not None:
+        payload["expanded"] = anchor.expanded
     destino.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
     return destino
+
+
+def anchor_locator_label(name: str) -> str | None:
+    """O timecode escrito no nome do locator de ancoragem; None quando nao e um."""
+    match = _ANCHOR_NAME_RE.match(name.strip())
+    return match.group(1) if match else None
+
+
+def sidecar_missing(als_path: str | Path) -> SidecarMissingError:
+    """A recusa de um set sem sidecar e sem outra fonte de ancoragem."""
+    origem = sidecar_path_for(als_path)
+    return SidecarMissingError(
+        f"there is no {origem.name} beside {Path(als_path).name} to discover the "
+        f"anchor; use the anchor locator of the set or give the start timecode "
+        f"with --start-tc and --frame-rate"
+    )
 
 
 def parse_anchor_locator_name(name: str, rate: TimecodeRate) -> int | None:
@@ -112,11 +177,7 @@ def read_anchor(als_path: str | Path) -> Anchor:
     """Le a ancoragem do sidecar. Levanta se o arquivo nao existir."""
     origem = sidecar_path_for(als_path)
     if not origem.exists():
-        raise SidecarMissingError(
-            f"there is no {origem.name} beside {Path(als_path).name} to discover the "
-            f"anchor; use the anchor locator of the set or give the start timecode "
-            f"on the command line"
-        )
+        raise sidecar_missing(als_path)
     dados = json.loads(origem.read_text(encoding="utf-8"))
     rate = dados["timecode_rate"]
     return Anchor(
@@ -134,7 +195,11 @@ def read_anchor(als_path: str | Path) -> Anchor:
         track_channels=dados.get("track_channels"),
         audio_source_indices=dados.get("audio_source_indices"),
         clip_ranges=dados.get("clip_ranges"),
+        clip_origins=dados.get("clip_origins"),
         track_bindings=dados.get("track_bindings"),
         media_hashes=dados.get("media_hashes"),
         origin_slots=dados.get("origin_slots"),
+        layout=dados.get("layout"),
+        blocks=dados.get("blocks"),
+        expanded=dados.get("expanded"),
     )

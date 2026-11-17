@@ -1,13 +1,9 @@
-"""Fade de um crossfade que conflita com a automacao segmentada.
+"""Crossfades e fades independentes no export.
 
-Quando a automacao de ganho corta a regiao de overlap, o crossfade nao vira
-Transition: o preflight ja reporta
-WRITE_TRANSITION_SEGMENTED_AUTOMATION_UNSUPPORTED. Os dois fades do par
-continuavam marcados como consumidos, e o fade-out do clipe anterior sumia
-do AAF sem aviso e sem envelope de ganho.
+Desde 16/11/2026 a automacao de ganho dentro do overlap nao impede a
+Transition: cada clip vai inteiro com o proprio envelope, e os dois fades do
+par viram a Transition.
 """
-
-import math
 
 import aaf2
 from aaf2.auid import AUID
@@ -188,12 +184,8 @@ def _sem_lacunas(tipos):
     return [t for t in tipos if t != "Filler"]
 
 
-def test_fade_out_de_crossfade_conflitante_vira_envelope(tmp_path):
-    """O fade-out do clipe anterior sobrevive como envelope de ganho.
-
-    Antes da correcao, o par era marcado como consumido mesmo sem Transition:
-    o fade-out sumia do AAF e nada era reportado sobre ele.
-    """
+def test_crossfade_com_automacao_no_overlap_vira_transition(tmp_path):
+    """O par vira Transition e nenhum fade fica como erro ou envelope."""
     wav = _make_dummy_wav(tmp_path / "audio.wav")
     asset = _asset(wav)
     tracks = [
@@ -212,16 +204,12 @@ def test_fade_out_de_crossfade_conflitante_vira_envelope(tmp_path):
     write_aaf(sessao, destino, relatorio)
 
     codigos = [issue.code for issue in relatorio.issues]
-    assert "WRITE_TRANSITION_SEGMENTED_AUTOMATION_UNSUPPORTED" in codigos
-    assert "WRITE_FADE_UNSUPPORTED" in codigos
-    assert "FADE_CONVERTED_TO_ENVELOPE" in codigos
+    assert "WRITE_CLIP_SKIPPED" not in codigos
+    assert "WRITE_FADE_UNSUPPORTED" not in codigos
+    assert "FADE_CONVERTED_TO_ENVELOPE" not in codigos
 
-    slots = _slots_de_audio(destino)
-    dados = slots[0][1]
-    assert dados["envelopes"] == 1
-    pontos = dados["pontos"]
-    assert pontos
-    assert math.isclose(pontos[-1][1], 0.0, abs_tol=1e-6)
+    dados = _slots_de_audio(destino)[0][1]
+    assert dados["tipos"].count("Transition") == 1
 
 
 def test_fade_independente_e_crossfade_seguem_caminhos_proprios(tmp_path):

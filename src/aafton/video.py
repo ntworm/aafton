@@ -10,6 +10,7 @@ import aaf2
 from .ir import SessionIR
 from .mxf import probe_arquivo, tem_video
 from .report import Report
+from .video_aaf import read_aaf_video_geometry
 from .timecode import label_to_samples, samples_to_label, samples_per_frame
 
 
@@ -327,60 +328,9 @@ def process_video(
             )
 
     # Find anchor from AAF
-    aaf_start_sec = None
-    aaf_duration_sec = None
-    aaf_source_offset = 0
-    try:
-        with aaf2.open(str(aaf_path), "r") as f:
-            compositions = [m for m in f.content.mobs if isinstance(m, aaf2.mobs.CompositionMob)]
-            if compositions:
-                comp = compositions[0]
-                for slot in comp.slots:
-                    seg = getattr(slot, "segment", None)
-                    if getattr(seg, "media_kind", "") == "Picture":
-                        from .timecode import exact_edit_rate
-                        from .aaf_read import _source_filename, _source_offset_samples
-
-                        rate = (
-                            exact_edit_rate(slot.edit_rate)
-                            if getattr(slot, "edit_rate", None)
-                            else exact_edit_rate(24)
-                        )
-                        components = getattr(seg, "components", None) or [seg]
-                        curr = 0
-                        for c in components:
-                            if isinstance(c, aaf2.components.Filler):
-                                curr += c.length
-                            elif isinstance(c, aaf2.components.NestedScope) or isinstance(
-                                c, aaf2.components.SourceClip
-                            ):
-                                aaf_start_sec = curr / rate
-                                aaf_duration_sec = c.length / rate
-                                if isinstance(c, aaf2.components.SourceClip) and c.start:
-                                    location = _source_filename(c)
-                                    if (
-                                        location
-                                        and Path(location).name.casefold()
-                                        == original_video_path.name.casefold()
-                                    ):
-                                        aaf_source_offset = _source_offset_samples(
-                                            c, session.sample_rate, rate, report
-                                        )
-                                    else:
-                                        report.error(
-                                            "VIDEO_SOURCE_UNCONFIRMED",
-                                            "AAF asks for a video trim, but the selected file was not identified as the source; confirm the consolidated video",
-                                            {},
-                                        )
-                                break
-    except Exception as exc:
-        from .report import StrictModeError
-
-        if isinstance(exc, StrictModeError):
-            raise
-        report.warning(
-            "VIDEO_AAF_READ_FAILED", f"could not read the video geometry of the AAF: {exc}", {}
-        )
+    aaf_start_sec, aaf_duration_sec, aaf_source_offset = read_aaf_video_geometry(
+        aaf_path, original_video_path, session.sample_rate, report
+    )
 
     start_samples = None
     anchor_source = None

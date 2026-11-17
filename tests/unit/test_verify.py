@@ -1273,3 +1273,86 @@ def test_verify_nao_muta_objeto_read_aaf(tmp_path, monkeypatch):
         f"A origem foi mutada: esperava 2 tracks de audio, encontrou {len(tracks_audio)}. "
         "verify_conversion não pode filtrar origem.tracks."
     )
+
+
+# Corte no fim da midia: o AAF pede mais que o WAV do set tem, o set termina no fim dele.
+MIDIA_CURTA = 48000 * 10
+INICIO_CORTE = UMA_HORA + 240000
+
+
+def _sessao_corte(wav, fim_relativo, *, offset=0, duracao=MIDIA_CURTA):
+    asset = MediaAsset(
+        id="m1",
+        filename=str(wav),
+        channels=1,
+        sample_rate=48000,
+        duration_samples=duracao,
+        status="resolved",
+        resolved_path=str(wav),
+    )
+    clip = ClipIR(
+        id="c0",
+        track_id="t0",
+        channel_index=0,
+        event_index=0,
+        name="voz.wav",
+        media_id="m1",
+        timeline_start_samples=INICIO_CORTE,
+        timeline_end_samples=INICIO_CORTE + fim_relativo,
+        source_offset_samples=offset,
+    )
+    track = TrackIR(
+        id="t0", source_index=0, name="Audio 7", kind="audio", channel_count=1, clips=[clip]
+    )
+    return SessionIR(
+        name="corte",
+        sample_rate=48000,
+        timecode_rate=TimecodeRate(24, 1, False),
+        start_timecode_samples=UMA_HORA,
+        tracks=[track],
+        media=[asset],
+    )
+
+
+def _verify_corte(tmp_path, excesso_aaf, fim_set, offset_set=0):
+    wav = tmp_path / "voz.wav"
+    wav.write_bytes(wav_bytes(MIDIA_CURTA))
+    aaf = tmp_path / "corte.aaf"
+    als = tmp_path / "corte.als"
+    # O AAF declara uma midia maior, para o export nao cortar nem reprovar o clip.
+    origem = _sessao_corte(wav, MIDIA_CURTA + excesso_aaf, duracao=MIDIA_CURTA + 48000)
+    write_aaf(origem, aaf, Report(strict=False))
+    write_session(
+        _sessao_corte(wav, fim_set, offset=offset_set),
+        TEMPLATE,
+        als,
+        WriteOptions(sample_rate=48000, bpm=60, live_origin_samples=UMA_HORA),
+        Report(strict=False),
+    )
+    return verify_conversion(aaf, als)
+
+
+def test_verify_aceita_clip_cortado_no_fim_da_midia(tmp_path):
+    resultado = _verify_corte(tmp_path, 216, MIDIA_CURTA)
+    assert [linha.status for linha in resultado.rows] == ["trimmed to media end"]
+    assert resultado.rows[0].delta_end_samples == -216
+    assert resultado.ok is True
+    assert "trimmed to media end" in resultado.to_table()
+
+
+def test_verify_reprova_corte_com_offset_diferente(tmp_path):
+    resultado = _verify_corte(tmp_path, 216, MIDIA_CURTA - 10, offset_set=10)
+    assert [linha.status for linha in resultado.rows] == ["out of tolerance"]
+    assert resultado.ok is False
+
+
+def test_verify_reprova_clip_encurtado_longe_do_fim_da_midia(tmp_path):
+    resultado = _verify_corte(tmp_path, 216, MIDIA_CURTA - 1000)
+    assert [linha.status for linha in resultado.rows] == ["out of tolerance"]
+    assert resultado.ok is False
+
+
+def test_verify_reprova_excesso_de_um_frame(tmp_path):
+    resultado = _verify_corte(tmp_path, 2000, MIDIA_CURTA)
+    assert [linha.status for linha in resultado.rows] == ["out of tolerance"]
+    assert resultado.ok is False

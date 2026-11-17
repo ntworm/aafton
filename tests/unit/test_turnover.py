@@ -1,8 +1,10 @@
 import hashlib
 import json
+import xml.etree.ElementTree as ET
 from pathlib import Path
 import pytest
 
+from aafton.als_xml import save_als
 from tests.aaf_factory import wav_bytes
 from aafton.cli import main
 from aafton.turnover import (
@@ -18,10 +20,6 @@ def turnover_fixture(tmp_path: Path):
     src_dir.mkdir()
 
     session_file = src_dir / "cena12.als"
-    import gzip
-
-    session_file.write_bytes(gzip.compress(b"<Ableton><LiveSet/></Ableton>"))
-
     media_dir = src_dir / "media"
     media_dir.mkdir()
 
@@ -31,6 +29,34 @@ def turnover_fixture(tmp_path: Path):
     b2 = wav_bytes(9600)
     w1.write_bytes(b1)
     w2.write_bytes(b2)
+
+    root = ET.Element("Ableton", Creator="Ableton Live 12.4.6")
+    live = ET.SubElement(root, "LiveSet")
+    tracks = ET.SubElement(live, "Tracks")
+    for idx, (w, name) in enumerate([(w1, "fala1"), (w2, "fala2")]):
+        track = ET.SubElement(tracks, "AudioTrack", Id=str(10 + idx))
+        eff = ET.SubElement(track, "Name")
+        ET.SubElement(eff, "EffectiveName", Value=name)
+        events = ET.SubElement(track, "DeviceChain")
+        seq = ET.SubElement(events, "MainSequencer")
+        sample = ET.SubElement(seq, "Sample")
+        arr = ET.SubElement(sample, "ArrangerAutomation")
+        evts = ET.SubElement(arr, "Events")
+        clip = ET.SubElement(evts, "AudioClip", Id=str(idx), Time="0.0")
+        ET.SubElement(clip, "CurrentStart", Value="0.0")
+        ET.SubElement(clip, "CurrentEnd", Value="1.0")
+        ET.SubElement(clip, "Name", Value=name)
+        sref = ET.SubElement(clip, "SampleRef")
+        fref = ET.SubElement(sref, "FileRef")
+        ET.SubElement(fref, "RelativePathType", Value="1")
+        ET.SubElement(fref, "RelativePath", Value=f"media/{w.name}")
+        ET.SubElement(fref, "Path", Value=str(w))
+    main_track = ET.SubElement(live, "MainTrack")
+    mixer = ET.SubElement(main_track, "DeviceChain")
+    mix = ET.SubElement(mixer, "Mixer")
+    tempo = ET.SubElement(mix, "Tempo")
+    ET.SubElement(tempo, "Manual", Value="60.0")
+    save_als(root, session_file)
 
     h1 = hashlib.sha256(b1).hexdigest()
     h2 = hashlib.sha256(b2).hexdigest()
@@ -63,7 +89,6 @@ def turnover_fixture(tmp_path: Path):
 def test_create_turnover_package_sucesso_com_sidecar(turnover_fixture):
     res = create_turnover_package(
         session_file=turnover_fixture["session_file"],
-        media_dir=turnover_fixture["media_dir"],
         output_dir=turnover_fixture["output_dir"],
         session_name="Cena12_Final",
     )
@@ -116,7 +141,6 @@ def test_create_turnover_package_modo_estrito_falha_com_midia_corrompida(turnove
     with pytest.raises(TurnoverError) as exc_info:
         create_turnover_package(
             session_file=turnover_fixture["session_file"],
-            media_dir=turnover_fixture["media_dir"],
             output_dir=turnover_fixture["output_dir"],
             strict=True,
         )
@@ -129,7 +153,6 @@ def test_create_turnover_package_modo_permissivo(turnover_fixture):
 
     res = create_turnover_package(
         session_file=turnover_fixture["session_file"],
-        media_dir=turnover_fixture["media_dir"],
         output_dir=turnover_fixture["output_dir"],
         strict=False,
     )
@@ -144,8 +167,6 @@ def test_cli_turnover_sucesso(turnover_fixture, capsys):
         [
             "turnover",
             str(turnover_fixture["session_file"]),
-            "--media-dir",
-            str(turnover_fixture["media_dir"]),
             "--output",
             str(out_dir),
             "--name",
@@ -165,8 +186,6 @@ def test_cli_turnover_falha_em_modo_estrito(turnover_fixture):
         [
             "turnover",
             str(turnover_fixture["session_file"]),
-            "--media-dir",
-            str(turnover_fixture["media_dir"]),
             "--output",
             str(out_dir),
         ]

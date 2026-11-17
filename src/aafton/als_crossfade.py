@@ -1,44 +1,28 @@
-"""Crossfade simetrico do Live: forma nativa no .als e volta da geometria logica.
+"""Crossfade simetrico do Live: a forma nativa no .als e as regras comuns.
 
 O Live nao aceita dois clips sobrepostos na mesma track do Arrangement: quando
-ele salva o arquivo, o clip que sai e truncado no ponto da juncao e o fade out
-dele some com os ultimos samples. O modelo nativo do Live e outro, e o proprio
-template o mostra: os dois clips ficam encostados, o clip que sai carrega o
-fade out inteiro e o clip que entra vem com CrossfadeInState=1 e
-FadeInLength=0.
+ele salva o arquivo, o clip que sai e truncado no ponto da juncao. O modelo
+nativo do Live e outro, medido no Live 12 em 15/11/2026 (oraculo de audio em
+``.local/artifacts/aafton-live-aaf-qualquer-set-20261115/xfade-live/``): os
+dois clips ficam encostados, o clip que entra tem CrossfadeInState=1 e
+FadeInLength=0, e o crossfade inteiro toca **antes** da juncao. O clip que sai
+desce dentro do proprio trecho visivel; o que entra comeca a tocar L antes do
+seu inicio visivel, com o material do arquivo anterior ao seu LoopStart.
 
-Este modulo tem as duas metades dessa traducao:
+Este modulo tem a metade do escritor (``canonicalizar_crossfades``) e a
+leitura dos sets de ``format_version`` <= 2 (``normalizar_crossfades``), que
+estende o clip que sai so quando o XML traz todas as provas da forma antiga.
+A leitura pelo modelo medido, e a escolha pela versao, moram em
+``als_crossfade_ler``.
 
-- ``canonicalizar_crossfades`` reescreve no XML o par que se sobrepoe, sem
-  tocar no IR nem no sidecar;
-- ``normalizar_crossfades`` reconstroi no leitor a geometria logica (a
-  sobreposicao que o AAF tem) usando so a evidencia dos proprios campos do
-  .als: o estado de crossfade, o fade out do vizinho e o excesso de material
-  da fonte em relacao a duracao visivel.
+Forma escrita, a do modelo medido: a juncao e o fim do clip que sai no AAF.
+O clip que sai fica com o fim e o FadeOutLength = L; o que entra ganha
+CurrentStart (e o atributo Time) na juncao, LoopStart avancado L segundos,
+FadeInLength 0 e CrossfadeInState 1. Assim o Live toca o crossfade em cima da
+sobreposicao do AAF.
 
-O par so vira a forma nativa quando o material do arquivo cobre o clip que
-sai: e a mesma prova que o leitor exige para devolver a geometria, e sem ela o
-escritor publicaria um .als que o leitor nao conseguiria refazer.
-
-O esquema e um **candidato offline**, derivado do template do Live: ele foi
-escrito e lido de volta nesta maquina, mas ninguem abriu o .als gerado no Live
-aqui, entao ele nao esta homologado. O que se observa nos casos C07 (crossfade)
-e C10 (dialeto Resolve) do pacote do Live e essa ida e a volta offline: o par
-sai com os clips encostados, o CrossfadeInState=1 e o FadeInLength=0, e o
-leitor refaz a sobreposicao. O manual do Live (6.8) prova a adjacencia dos
-clips e os limites de loop; ele nao prova o algoritmo do XML, o OutMarker, a
-direcao do crossfade nem a unidade do tempo. A ida e a volta em 120 BPM prova
-so que o par e coerente com ele mesmo, nao que a unidade sobreviva a um Save As.
-
-O leitor nao adivinha: sem o conjunto inteiro de provas a geometria antiga
-fica como esta, e um fade de render legado continua como era.
-
-Os marcadores de loop (LoopStart, OutMarker, HiddenLoopEnd) andam na mesma
-unidade no leitor e no escritor, e e por isso que a diferenca entre eles pode
-servir de prova. O Live grava esses campos em segundos quando o clip e reto: e
-o que o template e o exemplo medido em 60 BPM mostram, e nao foi medido fora
-de 60 BPM. Converter essa unidade em geral e outra tarefa, e aqui nao muda
-nada.
+Os marcadores de loop de um clip de audio sem warp (LoopStart, LoopEnd,
+HiddenLoopEnd) sao segundos do arquivo; posicao e fades sao beats do arranjo.
 """
 
 from __future__ import annotations
@@ -52,7 +36,7 @@ from typing import TYPE_CHECKING, Callable
 
 from .als_paths import AUDIO_CLIP_FIELDS
 from .als_xml import get_value, set_value
-from .als_write_base import TIMELINE, WriteOptions, samples_to_beats
+from .als_write_base import TIMELINE, WriteOptions, samples_to_beats, source_seconds
 from .ir import FadeIR
 
 if TYPE_CHECKING:
@@ -76,9 +60,9 @@ def material_cobre(
 ) -> bool:
     """O material do arquivo cobre o trecho que o clip usa.
 
-    Regra unica do leitor e do escritor: sem duracao conhecida, ou com taxa
-    diferente da sessao, nao ha prova contra o trecho; com as duas coisas
-    conhecidas o trecho e coberto quando o uso cabe na duracao do arquivo.
+    Sem duracao conhecida, ou com taxa diferente da sessao, nao ha prova
+    contra o trecho; com as duas coisas conhecidas o trecho e coberto quando o
+    uso cabe na duracao do arquivo.
     """
     if duracao is None:
         return True
@@ -97,17 +81,16 @@ def canonicalizar_crossfades(
     *,
     material: Callable[[object], tuple[int, int] | None] | None = None,
 ) -> None:
-    """Passa para a forma canonica do template os pares que se sobrepoem.
+    """Passa para a forma nativa medida os pares que se sobrepoem.
 
     ``pares`` traz o clip do IR e o no do XML de cada clip da track. A lista
     auxiliar e ordenada pelo inicio antes de procurar o par vizinho: nem o IR
     nem a ordem gravada no XML mudam, so a busca usa a ordem do tempo.
 
-    ``material`` pergunta ao arquivo do clip que sai a duracao e a taxa dele: o
-    par so vira a forma nativa quando o material cobre o clip, porque e a
-    mesma prova que o leitor exige para devolver a geometria. Uma resposta
-    desconhecida (None) cobre, como no leitor; sem ``material`` nada e
-    perguntado e o par entra na forma nativa como antes.
+    ``material`` fica na assinatura de quem chama, mas a forma medida nao
+    precisa mais dele: o clip que sai usa so o trecho do AAF, e o que entra
+    toca o crossfade com o material antes do LoopStart novo, que e o offset do
+    AAF (``_material_sustenta_o_crossfade``).
 
     So o XML muda: o IR e o sidecar continuam com a geometria logica, que e a
     do AAF de origem.
@@ -123,27 +106,18 @@ def canonicalizar_crossfades(
             continue
         if not _fades_sustentam_o_crossfade(clip_a, node_a, clip_b, node_b, L, options):
             continue
-        if not _material_sustenta_o_crossfade(clip_a, options, material):
+        if not _material_sustenta_o_crossfade(clip_b):
             continue
-        _escrever_canonica(node_a, node_b, L, options)
+        _escrever_canonica(node_a, node_b, clip_b, L, options)
 
 
-def _material_sustenta_o_crossfade(clip_a, options, material) -> bool:
-    """O material do arquivo cobre o clip que sai; sem prova, o par nao entra.
+def _material_sustenta_o_crossfade(clip_b) -> bool:
+    """O clip que entra tem L de material antes do LoopStart novo.
 
-    O escritor pergunta ao arquivo o mesmo que o leitor vai exigir: o material
-    tem de cobrir o offset da fonte mais a duracao logica do clip que sai. No
-    escritor a duracao logica ja e a visual mais o crossfade, entao o uso
-    calculado aqui e o mesmo que o leitor calcula do lado de la.
+    O LoopStart novo e o offset do AAF mais L, entao o material antes dele e o
+    offset do AAF mais L: basta o offset do AAF nao ser negativo.
     """
-    if material is None:
-        return True
-    resposta = material(clip_a)
-    if resposta is None:
-        return True
-    duracao, taxa = resposta
-    usado = (clip_a.source_offset_samples or 0) + clip_a.duration_samples
-    return material_cobre(duracao, taxa, options.sample_rate, usado)
+    return (clip_b.source_offset_samples or 0) >= 0
 
 
 def _pares_ordenados(pares: list[tuple[object, ET.Element]]) -> list[tuple[object, ET.Element]]:
@@ -165,15 +139,17 @@ def _pares_ordenados(pares: list[tuple[object, ET.Element]]) -> list[tuple[objec
 def _sobreposicao_de_crossfade(clip_a, clip_b) -> int | None:
     """Samples de sobreposicao que valem como crossfade, ou None se nao valem.
 
-    O par tem de ser de verdade: o clip que entra comeca depois do que sai, a
-    sobreposicao e positiva e cabe inteira dentro do clip que entra.
+    O par tem de ser de verdade: o clip que entra comeca depois do que sai e a
+    sobreposicao e positiva. Ela tem de ser menor que o clip que entra: na
+    forma nativa ele comeca na juncao, e com a duracao no AAF <= L ficaria com
+    comprimento zero, e o Live apaga o clip.
     """
     if clip_b.timeline_start_samples <= clip_a.timeline_start_samples:
         return None
     sobreposicao = clip_a.timeline_end_samples - clip_b.timeline_start_samples
     if sobreposicao <= 0:
         return None
-    if sobreposicao > clip_b.timeline_end_samples - clip_b.timeline_start_samples:
+    if sobreposicao >= clip_b.timeline_end_samples - clip_b.timeline_start_samples:
         return None
     return sobreposicao
 
@@ -204,9 +180,8 @@ def _fade_em_samples(node: ET.Element, campo: str, options: WriteOptions, minimo
 def _fades_sustentam_o_crossfade(clip_a, node_a, clip_b, node_b, L, options) -> bool:
     """Os fades do IR e os escritos no XML sustentam o mesmo comprimento.
 
-    O leitor vai provar depois com o que o escritor escreveu: o fade out do que
-    sai e o fade in do que entra valem L, e o fade in do que sai ainda cabe na
-    duracao visual que sobra depois do aparo.
+    O fade out do que sai e o fade in do que entra valem L, e o fade in do que
+    sai ainda cabe junto do fade out no clip que sai, que fica com o fim do AAF.
 
     O IR tambem tem de valer L. Um par que so ficou simetrico depois do
     clamping do escritor -- o fade in e o fade out do clip que entra
@@ -222,8 +197,7 @@ def _fades_sustentam_o_crossfade(clip_a, node_a, clip_b, node_b, L, options) -> 
         return False
     if not _fade_do_ir_equivale(clip_b, "in", L):
         return False
-    visual_a = clip_b.timeline_start_samples - clip_a.timeline_start_samples
-    return fade_in_a + L <= visual_a
+    return fade_in_a + L <= clip_a.duration_samples
 
 
 def _fade_do_ir_equivale(clip, kind: str, L: int) -> bool:
@@ -232,18 +206,22 @@ def _fade_do_ir_equivale(clip, kind: str, L: int) -> bool:
     return fade is not None and fade.duration_samples == L
 
 
-def _escrever_canonica(node_a: ET.Element, node_b: ET.Element, L: int, options) -> None:
-    """Escreve a forma nativa: A encosta em B, A carrega o fade out inteiro."""
-    inicio_b = node_b.find(AUDIO_CLIP_FIELDS["current_start"])
+def _escrever_canonica(node_a: ET.Element, node_b: ET.Element, clip_b, L: int, options) -> None:
+    """Escreve a forma medida: B comeca no fim de A, L segundos adiante na fonte."""
     fim_a = node_a.find(AUDIO_CLIP_FIELDS["current_end"])
+    inicio_b = node_b.find(AUDIO_CLIP_FIELDS["current_start"])
     if inicio_b is None or fim_a is None:
         return
-    texto = inicio_b.get("Value")
-    if texto is None:
+    juncao = fim_a.get("Value")
+    if juncao is None:
         return
-    # O texto do inicio de B vai inteiro para o fim de A: os dois clips ficam
-    # encostados no mesmo ponto da grade, sem arredondar nada pelo caminho.
-    fim_a.set("Value", texto)
+    # O texto do fim de A vai inteiro para o inicio de B, e o atributo Time
+    # acompanha o CurrentStart: os dois clips ficam encostados no mesmo ponto
+    # da grade, sem arredondar nada pelo caminho.
+    inicio_b.set("Value", juncao)
+    node_b.set("Time", juncao)
+    loop_start_b = source_seconds((clip_b.source_offset_samples or 0) + L, options.sample_rate)
+    set_value(node_b, AUDIO_CLIP_FIELDS["loop_start"], loop_start_b)
     set_value(node_a, AUDIO_CLIP_FIELDS["fade_out_length"], _beats(L, options))
     set_value(node_b, AUDIO_CLIP_FIELDS["crossfade_in_state"], 1)
     set_value(node_b, AUDIO_CLIP_FIELDS["fade_in_length"], 0.0)
@@ -251,7 +229,7 @@ def _escrever_canonica(node_a: ET.Element, node_b: ET.Element, L: int, options) 
 
 
 def _beats(samples: int, options: WriteOptions) -> float:
-    """Samples na unidade de tempo do Live: beats."""
+    """Samples na unidade de tempo do arranjo: beats."""
     return samples_to_beats(samples, options.sample_rate, options.bpm, TIMELINE)
 
 
@@ -264,7 +242,7 @@ def _zerar_curvas_de_entrada(node: ET.Element) -> None:
             pass
 
 
-# --- Leitura: a geometria logica de volta -----------------------------------
+# --- Leitura dos sets de format_version <= 2 --------------------------------
 
 
 def normalizar_crossfades(ctx: "ReadContext", pares: list[tuple[object, ET.Element]]) -> None:
@@ -368,30 +346,27 @@ def _provas_da_geometria(ctx, clip_a, node_a, clip_b, L) -> bool:
 def _excesso_de_fonte(ctx, node, clip, L) -> bool:
     """O material da fonte passa da duracao visual pelo comprimento do crossfade.
 
-    E o excesso que distingue o crossfade nativo de um fade de render legado:
-    no crossfade nativo o clip que sai guarda L samples de material a mais do
-    que a duracao visivel, porque e esse material que toca durante o
-    cruzamento com o vizinho.
+    E o excesso que distingue o crossfade da forma antiga de um fade de render
+    legado: o clip que sai guarda L samples de material a mais do que a duracao
+    visivel. O OutMarker e beats e o LoopStart e segundos: o material e
+    OutMarker x 60 / tempo - LoopStart, em segundos, depois em amostras da
+    sessao, com tolerancia de meia amostra.
 
-    Um OutMarker invalido, infinito ou tao grande que nao cabe em um inteiro
-    nao prova nada: a leitura recusa o par, sem abortar e sem inventar
-    geometria.
+    Um OutMarker invalido, infinito ou tao grande que estoura a conversao nao
+    prova nada: a leitura recusa o par, sem abortar e sem inventar geometria.
     """
     out_marker = get_value(node, AUDIO_CLIP_FIELDS["out_marker"])
     loop_start = get_value(node, AUDIO_CLIP_FIELDS["loop_start"])
     if out_marker is None or loop_start is None:
         return False
     try:
-        bruto = float(out_marker) - float(loop_start)
+        segundos = float(out_marker) * 60.0 / ctx.anchor.bpm - float(loop_start)
     except (TypeError, ValueError):
         return False
-    if not math.isfinite(bruto):
+    material = segundos * ctx.anchor.sample_rate
+    if not math.isfinite(material):
         return False
-    try:
-        material = ctx.samples(bruto)
-    except (OverflowError, TypeError, ValueError):
-        return False
-    return material - clip.duration_samples == L
+    return abs(material - (clip.duration_samples + L)) <= 0.5
 
 
 def _material_cobre(ctx, clip, L) -> bool:

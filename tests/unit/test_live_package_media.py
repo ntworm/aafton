@@ -45,7 +45,7 @@ from aafton.live_compat_media import (  # noqa: E402
 from aafton.live_compat_proveniencia import sha256_arquivo  # noqa: E402
 from aafton.report import Report  # noqa: E402
 from aafton.timecode import TimecodeRate  # noqa: E402
-from aafton.turnover import _iter_descriptors  # noqa: E402
+from aafton.collect_aaf import iter_descriptors  # noqa: E402
 from tests import aaf_factory  # noqa: E402
 
 FIXTURE = "TESTE_AFF_PROTOOLS"
@@ -59,7 +59,7 @@ def _urlstrings(arquivo) -> list:
     """Os URLString de locator do AAF aberto, com o objeto que os guarda."""
     urls = []
     for mob in arquivo.content.sourcemobs():
-        for descritor in _iter_descriptors(getattr(mob, "descriptor", None)):
+        for descritor in iter_descriptors(getattr(mob, "descriptor", None)):
             locators = descritor.get("Locator") if hasattr(descritor, "get") else None
             if not locators:
                 continue

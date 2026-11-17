@@ -1,9 +1,8 @@
-"""O material do arquivo decide se o escritor pode usar a forma nativa.
+"""O material do arquivo e a forma nativa do crossfade.
 
-O leitor so devolve a geometria logica do crossfade quando o material do
-arquivo cobre o clip que sai. O escritor precisa da mesma prova: publicar a
-forma nativa sem ela gera um .als que volta truncado, porque o leitor recusa
-estender o clip que sai sem material.
+A regra ``material_cobre`` segue servindo a leitura dos sets de
+``format_version`` <= 2. Na forma medida no Live o clip que sai nao precisa de
+material alem do AAF, entao a forma nativa sai com qualquer arquivo.
 """
 
 from __future__ import annotations
@@ -69,18 +68,14 @@ def _prepara_o_caso(tmp_path, frames):
     return conversao
 
 
-def _confere_a_sobreposicao_antiga(primeiro, segundo):
-    """Sem material que cubra o clip, o par fica com a sobreposicao antiga."""
-    assert get_value(segundo, AUDIO_CLIP_FIELDS["crossfade_in_state"]) == "0"
-    assert float(get_value(primeiro, AUDIO_CLIP_FIELDS["current_end"])) == 12.0
-
-
 def _confere_o_par_canonico(primeiro, segundo):
-    """Com material que cobre o clip, a forma nativa entra e o par canonico fecha."""
+    """A forma nativa medida: o clip que entra comeca no fim do que sai no AAF."""
     assert get_value(segundo, AUDIO_CLIP_FIELDS["crossfade_in_state"]) == "1"
     assert float(get_value(segundo, AUDIO_CLIP_FIELDS["fade_in_length"])) == 0.0
-    assert float(get_value(primeiro, AUDIO_CLIP_FIELDS["current_end"])) == 11.5
-    assert float(get_value(segundo, AUDIO_CLIP_FIELDS["current_start"])) == 11.5
+    assert float(get_value(primeiro, AUDIO_CLIP_FIELDS["current_end"])) == 12.0
+    assert float(get_value(segundo, AUDIO_CLIP_FIELDS["current_start"])) == 12.0
+    # O LoopStart do que entra avanca o crossfade (0,5 s) na fonte.
+    assert float(get_value(segundo, AUDIO_CLIP_FIELDS["loop_start"])) == 0.5
 
 
 def _confere_o_desvio_zero(conversao):
@@ -88,28 +83,31 @@ def _confere_o_desvio_zero(conversao):
     resultado = verify_conversion(conversao.aaf, conversao.als)
     linhas = [linha for linha in resultado.rows if linha.is_audio]
     assert len(linhas) == 2
+    assert resultado.ok
     for linha in linhas:
         assert linha.delta_samples == 0
+        # o clip que pede 1 sample alem do arquivo sai cortado no fim da midia
+        if linha.status == "trimmed to media end":
+            assert linha.delta_end_samples == -1
+            continue
         assert linha.delta_end_samples == 0
 
 
 @pytest.mark.parametrize("frames", [1, 95999, 96000, 48000 * 70])
-def test_a_forma_nativa_so_sai_quando_o_leitor_consegue_provar_a_volta(tmp_path, frames):
-    """O .als canonico so sai quando o material do arquivo cobre o clip que sai.
+def test_a_forma_nativa_nao_depende_do_material_do_clip_que_sai(tmp_path, frames):
+    """A forma medida nao pede material alem do AAF ao clip que sai.
 
-    Com o arquivo curto (1 ou 95999 samples) o par fica com a sobreposicao
-    antiga: o leitor nao conseguiria devolver a geometria, e o .als canonico
-    voltaria truncado. Com o arquivo do tamanho do clip (96000 samples) ou
-    maior, a forma nativa entra e a volta fecha com desvio zero.
+    O clip que sai fica com o trecho do AAF, e o que entra toca o crossfade
+    com o material antes do LoopStart novo, que e o offset do AAF. Com o
+    arquivo curto (1 ou 95999 samples), do tamanho do clip (96000) ou maior, a
+    forma nativa entra e a volta fecha com o mesmo desvio da leitura do AAF.
     """
+    assert DURACAO_DO_CLIP == 96000
     conversao = _prepara_o_caso(tmp_path, frames)
 
     clips = _clips_do_als(conversao.als)
     assert len(clips) == 2
     primeiro, segundo = clips
-    if frames < DURACAO_DO_CLIP:
-        _confere_a_sobreposicao_antiga(primeiro, segundo)
-    else:
-        _confere_o_par_canonico(primeiro, segundo)
+    _confere_o_par_canonico(primeiro, segundo)
 
     _confere_o_desvio_zero(conversao)

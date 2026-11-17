@@ -4,7 +4,7 @@ from typing import Any
 from .als_paths import LOCATOR_FIELDS
 from .als_write_base import AnchorError, WriteOptions, to_beats
 from .als_xml import IdAllocator, clone, renumber_siblings, set_value
-from .ir import SessionIR
+from .ir import PRODUCTION_LAYOUT, SessionIR
 from .report import Report
 from .timecode import TimecodeRate, label_to_samples, samples_to_label
 
@@ -121,14 +121,16 @@ def write_locators(
         locators.remove(velho)
 
     # A ordem dos clone() importa: os ids sao alocados na ordem das chamadas.
-    locators.append(
-        _locator_ancora(locator_prototype, allocator, posicionais, unicos, origin, session)
-    )
-    hour_locator = _locator_hora(
-        locator_prototype, allocator, posicionais, unicos, origin, session, options, report
-    )
-    if hour_locator is not None:
-        locators.append(hour_locator)
+    # Som direto nao tem timecode continuo: sem ancoragem nem 1 h, so os blocos.
+    if session.layout != PRODUCTION_LAYOUT:
+        locators.append(
+            _locator_ancora(locator_prototype, allocator, posicionais, unicos, origin, session)
+        )
+        hour_locator = _locator_hora(
+            locator_prototype, allocator, posicionais, unicos, origin, session, options, report
+        )
+        if hour_locator is not None:
+            locators.append(hour_locator)
 
     for marker in session.markers:
         xml_loc = _locator_marcador(

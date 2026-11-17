@@ -13,11 +13,15 @@ from pathlib import Path
 
 from .als_xml import get_value, load_als
 from .als_write import SENTINEL_TIME
-from .ir import MarkerIR, SessionIR, TrackIR
+from .ir import ABSOLUTE_LAYOUT, EXPANDED_MARK, PRODUCTION_LAYOUT, MarkerIR, SessionIR, TrackIR
 from .ltc_track import drop_generated_tracks
 from .report import Report
-from .sidecar import read_anchor, parse_anchor_locator_name, SidecarMissingError, Anchor
-from .timecode import TimecodeRate, _LABEL_RE
+from .sidecar import Anchor, ProductionSetError, read_anchor, sidecar_path_for
+from .timecode import _LABEL_RE
+
+from .als_ancora import TEMPO_PADRAO, StartSpec, ancora_sem_sidecar
+from .als_preflight import MIDI_CLIP_PATH
+from .als_render import RenderLog, fechar_leitura, reemitir
 
 from .als_read_bindings import (
     BindingLookup,
@@ -139,50 +143,22 @@ def _extract_track_automation(
         report.warning(
             "ALS_AUTOMATION_UNSUPPORTED",
             f"automation of {track.name!r} is not yet reconciled for export",
-            {"track": track.name, "envelopes": sorted(sem_destino)},
+            {"track": track.name, "track_id": track.id, "envelopes": sorted(sem_destino)},
         )
         return True
     return False
 
 
-def _anchor_from_locator(path: Path, root: ET.Element, report: Report) -> Anchor | None:
-    """Recupera a ancoragem de um locator 'TC ' quando o sidecar sumiu."""
-    rate_padrao = TimecodeRate(24, 1)
-    for locator in root.findall(".//LiveSet/Locators/Locators/Locator"):
-        nome_node = locator.find("Name")
-        if nome_node is None:
-            continue
-        nome = nome_node.get("Value", "")
-        if not nome.startswith("TC "):
-            continue
-        samples = parse_anchor_locator_name(nome, rate_padrao)
-        if samples is None:
-            continue
-        report.warning(
-            "SIDECAR_RECOVERED",
-            "the anchoring came from the locator because the sidecar was not there",
-            {"locator": nome},
-        )
-        return Anchor(
-            live_origin_samples=samples,
-            session_start_samples=samples,
-            sample_rate=48000,
-            timecode_rate=rate_padrao,
-            bpm=60.0,
-            source_path=str(path),
-        )
-    return None
-
-
-def _load_anchor(path: Path, root: ET.Element, report: Report) -> Anchor:
-    """Ancoragem do sidecar; sem sidecar, tenta o locator 'TC '."""
+def _tempo_do_set(root: ET.Element) -> float:
+    """O tempo do set (Manual da MainTrack); sem ele, o padrao do Live."""
+    main_track = _main_track(root)
+    if main_track is None:
+        return TEMPO_PADRAO
+    tempo = get_value(main_track, "DeviceChain/Mixer/Tempo/Manual")
     try:
-        return read_anchor(path)
-    except SidecarMissingError as e:
-        anchor = _anchor_from_locator(path, root, report)
-        if anchor is None:
-            raise e
-        return anchor
+        return float(tempo) if tempo is not None else TEMPO_PADRAO
+    except ValueError:
+        return TEMPO_PADRAO
 
 
 def _main_track(root: ET.Element) -> ET.Element | None:
@@ -279,6 +255,14 @@ def _set_group_path(track: TrackIR, track_node: ET.Element, group_names: dict[st
         track.group_path.append(gname)
 
 
+def _marcar_track_id(issues: list, inicio: int, track_id: str) -> None:
+    """Completa track_id nas issues da faixa emitidas por helpers sem esse campo."""
+    for issue in issues[inicio:]:
+        contexto = issue.context
+        if "track" in contexto and "kind" not in contexto and "track_id" not in contexto:
+            contexto["track_id"] = track_id
+
+
 def _read_track(
     ctx: ReadContext,
     track_node: ET.Element,
@@ -294,6 +278,8 @@ def _read_track(
         kind="audio",
         channel_count=1,
     )
+    ctx.render.track_nomes[track.id] = track.name
+    inicio_issues = len(ctx.report.issues)
     pan = get_value(track_node, "DeviceChain/Mixer/Pan/Manual")
     if pan is not None:
         track.pan = float(pan)
@@ -304,6 +290,7 @@ def _read_track(
     if _extract_track_automation(track, track_node, ctx.absolute, ctx.report):
         message = f"automation of {track.name!r} is not yet reconciled for export"
         ctx.session.unsupported_export_features.append(message)
+        ctx.render.features[track.id] = message
     _set_group_path(track, track_node, group_names)
     read_track_clips(ctx, track, track_node, indice)
 
@@ -313,7 +300,9 @@ def _read_track(
     elif uses_legacy_channels(lookup, track):
         apply_legacy_channels(track, ctx.anchor, indice)
     elif track.clips:
-        infer_channels_from_media(track, ctx.session, ctx.report)
+        mista = ctx.render.mista if ctx.sem_sidecar else None
+        infer_channels_from_media(track, ctx.session, ctx.report, mista)
+    _marcar_track_id(ctx.report.issues, inicio_issues, track.id)
     return track
 
 
@@ -337,11 +326,68 @@ def _read_markers(ctx: ReadContext, root: ET.Element) -> None:
         )
 
 
-def read_session(als_path: str | Path, report: Report) -> SessionIR:
-    """Le um .als gerado por esta ferramenta e reconstroi o SessionIR."""
+def read_session(
+    als_path: str | Path,
+    report: Report,
+    *,
+    allow_production: bool = False,
+    start: StartSpec | None = None,
+    leave_out_render: bool = False,
+) -> SessionIR:
+    """Le um .als e reconstroi o SessionIR.
+
+    Um set de som direto (layout ``production_blocks`` no sidecar) e recusado
+    com ``ProductionSetError``, porque a volta dele ainda nao existe; o verify
+    e o inspect leem com ``allow_production`` e recebem os tempos do set.
+
+    Um set sem o sidecar do aafton e ancorado por ``start`` (ver
+    ``als_ancora``); sem ``start``, so pelo locator ``TC`` do aafton, e sem
+    ele a recusa e ``SidecarMissingError``. ``leave_out_render`` deixa de fora
+    os clips que pedem render no Live; so vale num set sem sidecar.
+    """
     path = Path(als_path)
     root = load_als(path)
-    anchor = _load_anchor(path, root, report)
+    if not sidecar_path_for(path).exists():
+        return _read_sem_sidecar(path, root, report, start, leave_out_render)
+    anchor = read_anchor(path)
+    if anchor.layout == PRODUCTION_LAYOUT and not allow_production:
+        raise ProductionSetError()
+    session, _ = _read_anchored(path, root, report, anchor)
+    return session
+
+
+def _read_sem_sidecar(
+    path: Path, root: ET.Element, report: Report, start: StartSpec | None, leave_out: bool
+) -> SessionIR:
+    """Set sem registro do aafton: le num relatorio que nao levanta e reemite.
+
+    Assim a lista de render sai inteira, num unico erro, mesmo no estrito.
+    """
+    leitura = Report(strict=False)
+    anchor = ancora_sem_sidecar(path, root, leitura, start, _tempo_do_set(root))
+    session, ctx = _read_anchored(
+        path, root, leitura, anchor, sem_sidecar=True, render=RenderLog(leave_out=leave_out)
+    )
+    midi = [
+        _track_name(node)
+        for node in root.findall("./LiveSet/Tracks/MidiTrack")
+        if node.find(MIDI_CLIP_PATH) is not None
+    ]
+    fechar_leitura(ctx.render, leitura, session, midi)
+    reemitir(leitura, report)
+    return session
+
+
+def _read_anchored(
+    path: Path,
+    root: ET.Element,
+    report: Report,
+    anchor: Anchor,
+    *,
+    sem_sidecar: bool = False,
+    render: RenderLog | None = None,
+) -> tuple[SessionIR, ReadContext]:
+    """Le tracks, mix e marcadores do set com a ancoragem ja resolvida."""
     _check_tempo(anchor, root, report)
     _check_tempo_automation(anchor, root, report)
 
@@ -352,8 +398,12 @@ def read_session(als_path: str | Path, report: Report) -> SessionIR:
         start_timecode_samples=anchor.session_start_samples,
         source_path=str(path),
         source_application="Ableton Live",
+        layout=PRODUCTION_LAYOUT if anchor.layout == PRODUCTION_LAYOUT else ABSOLUTE_LAYOUT,
+        layout_blocks=list(anchor.blocks or []),
     )
-    ctx = ReadContext(path, anchor, report, session)
+    ctx = ReadContext(
+        path, anchor, report, session, sem_sidecar=sem_sidecar, render=render or RenderLog()
+    )
 
     audio_nodes = root.findall("./LiveSet/Tracks/AudioTrack")
     lookup = BindingLookup(
@@ -368,5 +418,17 @@ def read_session(als_path: str | Path, report: Report) -> SessionIR:
     read_unsupported_mix(ctx, root)
     check_multichannel_members(anchor, session, report)
     _read_markers(ctx, root)
+    _mark_expanded_tracks(session, anchor)
     drop_generated_tracks(session, report)
-    return session
+    return session, ctx
+
+
+def _mark_expanded_tracks(session: SessionIR, anchor: Anchor) -> None:
+    """Marca as irmas da expansao de canais, pelo nome no sidecar; elas ficam no set."""
+    irmas = (anchor.expanded or {}).get("tracks") or {}
+    for track in session.tracks:
+        if track.name not in irmas:
+            continue
+        if not isinstance(getattr(track, "raw", None), dict):
+            track.raw = {}
+        track.raw["expanded"] = EXPANDED_MARK

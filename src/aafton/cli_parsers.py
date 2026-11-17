@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import argparse
 
+from .cli_organize import add_organize_import_args, add_organize_inspect_args
+
 
 def add_ui_parsers(sub: argparse._SubParsersAction, func) -> None:
     """Registra os subcomandos ui e gui, que sobem a interface web local."""
@@ -31,8 +33,13 @@ def add_app_parser(sub: argparse._SubParsersAction, func) -> None:
 
 def add_import_parser(sub: argparse._SubParsersAction, func, edl_taxa, rates_ltc) -> None:
     """Subparser do import, com as opcoes do AAF e dos formatos de troca."""
-    p_import = sub.add_parser("import", help="AAF, EDL, XML or FCPXML -> .als")
-    p_import.add_argument("input", help="source file (.aaf, .edl, .xml or .fcpxml)")
+    p_import = sub.add_parser(
+        "import", help="AAF, EDL, XML, FCPXML or production audio (folder or .wav) -> .als"
+    )
+    p_import.add_argument(
+        "input",
+        help="source file (.aaf, .edl, .xml or .fcpxml) or a production audio folder or .wav",
+    )
     p_import.add_argument("output", help="path of the .als to be generated")
     p_import.add_argument(
         "--template",
@@ -72,6 +79,7 @@ def add_import_parser(sub: argparse._SubParsersAction, func, edl_taxa, rates_ltc
         help="how to group tracks: prefix deduces groups by name, none leaves them all separate",
     )
     _add_import_extra_args(p_import, edl_taxa, rates_ltc)
+    add_organize_import_args(p_import)
     p_import.set_defaults(func=func)
 
 
@@ -99,6 +107,18 @@ def _add_import_extra_args(p_import, edl_taxa, rates_ltc) -> None:
         "--report", default=None, help="path of the JSON report of the conversion"
     )
     p_import.add_argument("--edl-rate", type=edl_taxa, help=f"EDL rate: {', '.join(rates_ltc)}")
+    p_import.add_argument(
+        "--circled-only",
+        action="store_true",
+        help="production audio only: leaves out the takes that are not circled",
+    )
+    p_import.add_argument(
+        "--production-audio",
+        default=None,
+        metavar="FOLDER",
+        help="AAF, EDL or XML only: recorder folder whose inputs left out by the editor "
+        "come in as sibling tracks",
+    )
 
 
 def add_export_parser(sub: argparse._SubParsersAction, func) -> None:
@@ -127,8 +147,21 @@ def add_export_parser(sub: argparse._SubParsersAction, func) -> None:
 def add_inspect_parser(sub: argparse._SubParsersAction, func, edl_taxa, rates_ltc) -> None:
     """Subparser do inspect, que despeja o SessionIR como JSON."""
     p_inspect = sub.add_parser("inspect", help="dumps the SessionIR as JSON")
-    p_inspect.add_argument("input", help="file to inspect (.aaf, .als or exchange format)")
+    p_inspect.add_argument(
+        "input",
+        help="file to inspect (.aaf, .als or exchange format) or a production audio folder",
+    )
     p_inspect.add_argument("--edl-rate", type=edl_taxa, help=f"EDL rate: {', '.join(rates_ltc)}")
+    p_inspect.add_argument(
+        "--production-audio",
+        default=None,
+        metavar="FOLDER",
+        help="shows per take the matched recorder file and the inputs that would be added",
+    )
+    p_inspect.add_argument(
+        "--audio-dir", default=None, help="extra folder to look for the media of the AAF"
+    )
+    add_organize_inspect_args(p_inspect)
     p_inspect.set_defaults(func=func)
 
 
@@ -137,7 +170,9 @@ def add_verify_parser(sub: argparse._SubParsersAction, func) -> None:
     p_verify = sub.add_parser(
         "verify", help="compares the origin (AAF, EDL, XML or FCPXML) with the generated .als"
     )
-    p_verify.add_argument("aaf", help="source file (.aaf, .edl, .xml or .fcpxml)")
+    p_verify.add_argument(
+        "aaf", help="source file (.aaf, .edl, .xml or .fcpxml), or the production audio folder"
+    )
     p_verify.add_argument("als", help="generated .als session to compare")
     p_verify.add_argument(
         "--tolerance-samples",
@@ -210,7 +245,6 @@ def add_turnover_parser(sub: argparse._SubParsersAction, func) -> None:
         "turnover", help="creates a self-contained package with a SHA-256 manifest and a report"
     )
     p_turnover.add_argument("session", help="session file (.als or .aaf)")
-    p_turnover.add_argument("--media-dir", default=None, help="folder with the audio files")
     p_turnover.add_argument(
         "--output", "-o", default=None, help="destination folder of the package"
     )
@@ -222,3 +256,25 @@ def add_turnover_parser(sub: argparse._SubParsersAction, func) -> None:
         "--json", default=None, help="saves the manifest as json in the given path"
     )
     p_turnover.set_defaults(func=func)
+
+
+def add_collect_parser(sub: argparse._SubParsersAction, func) -> None:
+    """Subparser do collect, que junta a midia do set ou AAF numa pasta."""
+    p_collect = sub.add_parser(
+        "collect",
+        help="collects all media of a Live set (.als) or linked AAF into a destination folder",
+    )
+    p_collect.add_argument("source", help="source session file (.als or .aaf)")
+    p_collect.add_argument(
+        "--dest", "-d", required=True, help="empty or new destination folder for the package"
+    )
+    p_collect.add_argument(
+        "--name", default=None, help="output session name (default: source stem)"
+    )
+    p_collect.add_argument(
+        "--no-video", action="store_true", help="leaves video files out of the copied media"
+    )
+    p_collect.add_argument(
+        "--json", action="store_true", help="prints the collect report as JSON on stdout"
+    )
+    p_collect.set_defaults(func=func)

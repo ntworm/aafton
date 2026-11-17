@@ -386,13 +386,13 @@ def _clonar_master_mob(f, master_mob, source_mob, nome: str):
 
 
 def _target_clip_name(clip_name: str, channel_index: int, is_mono_split: bool) -> str:
-    """Nome do MasterMob para o clipe, acrescentando sufixo .L/.R quando split."""
-    if not is_mono_split:
+    """Nome do MasterMob com sufixo .L/.R quando split; "X.L" vira "X.R", nunca "X.L.R"."""
+    letra = "L" if channel_index == 0 else ("R" if channel_index == 1 else "")
+    if not is_mono_split or not letra:
         return clip_name
-    suffix = ".L" if channel_index == 0 else (".R" if channel_index == 1 else "")
-    if suffix and not clip_name.endswith(suffix):
-        return f"{clip_name}{suffix}"
-    return clip_name
+    if len(clip_name) >= 2 and clip_name[-2] in ".-_" and clip_name[-1] in "LR":
+        return f"{clip_name[:-1]}{letra}"
+    return f"{clip_name}.{letra}"
 
 
 class MobResolver:

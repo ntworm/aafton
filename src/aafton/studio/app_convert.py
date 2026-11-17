@@ -11,10 +11,12 @@ from __future__ import annotations
 from pathlib import Path
 
 from ..bundled import default_template
+from ..cli_organize import SINAIS, com_compact
 from ..pipeline import ImportOptions, import_session
 from ..report import Report, StrictModeError
 from ..verify import verify_conversion
-from . import app_view
+from . import app_collect, app_expandir, app_view
+from .app_messages import falha_da_conversao, falha_do_motor, mensagem_de_arquivo, pasta_impossivel
 from .app_read import error, taxa_edl
 
 # The last file written per direction, with the report of that conversion.
@@ -34,6 +36,11 @@ def convert(payload: dict) -> dict:
         from . import app_set
 
         return app_set.convert_to_aaf(payload)
+    if direction == "production":
+        # O import fica dentro da funcao: app_pa importa este modulo.
+        from . import app_pa
+
+        return app_pa.convert(payload)
     return error("bad_request", "The direction must be to_live or to_aaf.")
 
 
@@ -50,38 +57,75 @@ def convert_to_live(payload: dict) -> dict:
     problema = _problema_do_request(payload, entrada, destino)
     if problema is not None:
         return problema
-    return _converte(pedido, entrada, destino)
+    opcoes = payload.get("options") or {}
+    coletar = opcoes.get("collect_media") is True
+    return _converte(pedido, entrada, destino, app_expandir.folder(payload), collect_media=coletar)
 
 
 def _problema_do_request(payload: dict, entrada: str, destino: Path) -> dict | None:
     """The error of a request that cannot be converted; None when it can."""
     if destino.exists() and not payload.get("overwrite"):
         return error("exists", f"The file {destino} already exists.")
-    if not Path(entrada).exists():
-        return error("not_found", f"The file {entrada} was not found.")
-    template = _template_nomeado(payload)
-    if template and not Path(template).exists():
-        return error("not_found", f"The file {template} was not found.")
+    return problema_dos_arquivos(destino, entrada, _template_nomeado(payload))
+
+
+def problema_dos_arquivos(destino: Path, *lidos: str) -> dict | None:
+    """The error of a destination folder that cannot be made or of a file that is gone.
+
+    A missing destination folder is not an error: the writer makes it.
+    """
+    impossivel = pasta_impossivel(destino)
+    if impossivel is not None:
+        return error("bad_request", impossivel)
+    # A fonte e o template que sumiram dizem que sumiram, sem o erro do sistema.
+    for nomeado in lidos:
+        if nomeado and not Path(nomeado).exists():
+            return error("not_found", sumiu(nomeado))
     return None
 
 
-def _converte(pedido: ImportOptions, entrada: str, destino: Path) -> dict:
-    """Runs the import of the source and answers with what it was worth."""
+def sumiu(caminho) -> str:
+    """The message of a file to read that is no longer where it was."""
+    return mensagem_de_arquivo(FileNotFoundError(), caminho, "read")
+
+
+def _converte(
+    pedido: ImportOptions,
+    entrada: str,
+    destino: Path,
+    gravador: str | None,
+    *,
+    collect_media: bool = False,
+) -> dict:
+    """Runs the import of the source and answers with what it was worth.
+
+    ``gravador`` is the production audio folder; without it the import is
+    called exactly as it always was.
+    """
     report = Report(strict=not pedido.permissive)
     antes = estado_do_destino(destino)
+    extra = {"production_audio": gravador} if gravador else {}
     try:
-        import_session(pedido, report)
+        import_session(pedido, report, **extra)
     except StrictModeError as exc:
         LAST["to_live"] = {"output": None, "report": report}
         return resposta(False, destino, veredito_parado(str(exc)), True, report)
     except Exception as exc:  # noqa: BLE001 - the message of the engine is the answer
         registra_falha("to_live", report)
-        return error("failed", str(exc))
+        return error("failed", falha_da_conversao(exc, destino, report, Path(entrada)))
 
     escrito = registra("to_live", destino, report, antes)
     if not escrito:
         return resposta(False, destino, veredito_nao_escrito(report), False, report)
-    return resposta(escrito, destino, verdict_live(report, destino, Path(entrada)), False, report)
+    collect_rep, collect_err = (
+        app_collect.collect_for_export(destino, report) if collect_media else (None, None)
+    )
+    verdict = app_collect.append_collect_verdict(
+        verdict_live(report, destino, Path(entrada)), collect_rep
+    )
+    return app_collect.attach_collect_error(
+        resposta(escrito, destino, verdict, False, report), collect_err
+    )
 
 
 def estado_do_destino(destino: Path) -> tuple[bool, int, int]:
@@ -167,6 +211,27 @@ def caminhos(payload: dict) -> tuple[str, str]:
     )
 
 
+def _primeiro(options: dict, *nomes: str):
+    """O primeiro valor presente entre os nomes, ou None."""
+    return next((options[n] for n in nomes if options.get(n) is not None), None)
+
+
+def _opcoes_de_organizacao(options: dict) -> dict:
+    """Campos de organizacao do ImportOptions; groups prefix vale organize prefix."""
+    organize = str(options.get("organize") or "").strip() or "off"
+    if options.get("groups") == "prefix":
+        organize = "prefix"
+    sinais = _primeiro(options, "signals", "organize_signals")
+    edicoes = _primeiro(options, "edits", "organize_edits")
+    return {
+        "groups": "prefix" if organize == "prefix" else "none",
+        "organize": organize,
+        "certainty": str(options.get("certainty") or "permissive"),
+        "organize_signals": com_compact(sinais) if sinais is not None else SINAIS,
+        "organize_edits": edicoes if isinstance(edicoes, dict) else None,
+    }
+
+
 def _opcoes_do_import(payload: dict, entrada: str, destino: Path) -> ImportOptions:
     """The options of the import, from the payload of the request.
 
@@ -177,6 +242,7 @@ def _opcoes_do_import(payload: dict, entrada: str, destino: Path) -> ImportOptio
     taxa, problema = taxa_edl(payload.get("edl_rate"))
     if problema:
         raise ValueError(problema)
+    organizacao = _opcoes_de_organizacao(options)
     return ImportOptions(
         input=entrada,
         output=str(destino),
@@ -185,7 +251,7 @@ def _opcoes_do_import(payload: dict, entrada: str, destino: Path) -> ImportOptio
         bpm=bpm,
         stereo=str(options.get("stereo") or "pair"),
         fades=str(options.get("fades") or "absorb"),
-        groups=str(options.get("groups") or "none"),
+        groups=organizacao.pop("groups"),
         audio_dir=_texto(payload.get("audio_dir")),
         video=_texto(options.get("video")),
         video_start=_texto(options.get("video_start")),
@@ -194,6 +260,7 @@ def _opcoes_do_import(payload: dict, entrada: str, destino: Path) -> ImportOptio
         permissive=str(options.get("mode") or "strict").lower() == "permissive",
         ltc=options.get("ltc") is True,
         edl_rate=taxa,
+        **organizacao,
     )
 
 
@@ -204,7 +271,7 @@ def verdict_live(report: Report, als: Path, source: Path) -> dict:
     try:
         resultado = verify_conversion(source, als)
     except Exception as exc:  # noqa: BLE001 - a verification that cannot run is said
-        motivo = str(exc)
+        motivo = falha_do_motor(exc, als, "read")
 
     erros = report.count("error")
     if erros:
@@ -233,6 +300,8 @@ def verify_lines(result) -> list[str]:
     ]
     if result.tolerance_samples:
         linhas.append(f"tolerance {result.tolerance_samples} samples (frame-exact source)")
+    # As irmas da expansao de canais, conferidas a parte do AAF.
+    linhas.extend(app_expandir.verdict_lines(result))
     return linhas
 
 
@@ -241,7 +310,8 @@ def detalhe_da_diferenca(resultado) -> list[str]:
     detalhe = verify_lines(resultado)
     if resultado.audio_missing or resultado.audio_extra:
         detalhe.append(f"{resultado.audio_missing} missing, {resultado.audio_extra} extra")
-    if resultado.errors:
+    # A falha das irmas ja pode estar no detalhe: nao se repete.
+    if resultado.errors and resultado.errors[0] not in detalhe:
         detalhe.append(resultado.errors[0])
     return detalhe
 

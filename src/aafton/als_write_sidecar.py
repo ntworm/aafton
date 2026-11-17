@@ -3,8 +3,8 @@ from pathlib import Path
 
 from .als_write_base import WriteOptions
 from .als_write_tracks import WriteContext
-from .ir import SessionIR
-from .sidecar import Anchor, write_sidecar
+from .ir import EXPANDED_MARK, PRODUCTION_LAYOUT, SessionIR
+from .sidecar import SIDECAR_FORMAT_VERSION, Anchor, write_sidecar
 
 
 def _video_path_e_anchor(session: SessionIR) -> tuple[str | None, str | None]:
@@ -52,6 +52,33 @@ def _caminho_absoluto(caminho: Path) -> Path:
     return caminho.resolve()
 
 
+def _expandidas(session: SessionIR) -> dict | None:
+    """Irmas da expansao de canais: a marca e, por clip, o original e a entrada.
+
+    As irmas sao guardadas pelo nome da track, que a expansao faz unico no set.
+    """
+    tracks: dict[str, dict] = {}
+    meta: dict = {}
+    for track in session.tracks:
+        raw = getattr(track, "raw", None)
+        if not isinstance(raw, dict) or raw.get("expanded") != EXPANDED_MARK:
+            continue
+        meta = meta or raw
+        tracks[track.name] = {
+            "mark": EXPANDED_MARK,
+            "owner": raw.get("owner"),
+            "clips": [dict(c.raw["expanded"]) for c in track.clips if "expanded" in c.raw],
+        }
+    if not tracks:
+        return None
+    return {
+        "folder": meta.get("folder"),
+        "editor": meta.get("editor"),
+        "editor_sha256": meta.get("editor_sha256"),
+        "tracks": tracks,
+    }
+
+
 def write_anchor_sidecar(
     output_path: str | Path,
     session: SessionIR,
@@ -64,7 +91,7 @@ def write_anchor_sidecar(
     write_sidecar(
         output_path,
         Anchor(
-            format_version=2,
+            format_version=SIDECAR_FORMAT_VERSION,
             live_origin_samples=origin,
             session_start_samples=session.start_timecode_samples,
             sample_rate=options.sample_rate,
@@ -78,7 +105,18 @@ def write_anchor_sidecar(
             track_channels={t.name: t.channel_count for t in session.tracks},
             audio_source_indices=ctx.audio_source_indices,
             clip_ranges=ctx.clip_ranges,
+            clip_origins=ctx.clip_origins
+            if any(
+                key
+                for entry in ctx.clip_origins
+                for _, _, keys in entry.get("clips", ())
+                for key in keys
+            )
+            else None,
             track_bindings=ctx.track_bindings,
             media_hashes=media_hashes if media_hashes else None,
+            layout=session.layout if session.layout == PRODUCTION_LAYOUT else None,
+            blocks=session.layout_blocks if session.layout == PRODUCTION_LAYOUT else None,
+            expanded=_expandidas(session),
         ),
     )

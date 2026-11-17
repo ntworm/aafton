@@ -11,6 +11,13 @@ Regras que valem para todo este modulo:
   depois de um campo com default sem reordenar a classe inteira e quebrar todo
   mundo que a constroi.
 - Este modulo nao importa nada de I/O, XML ou AAF. E o contrato.
+
+Excecao declarada, som direto: um ``SessionIR`` com ``layout`` igual a
+``PRODUCTION_LAYOUT`` guarda os tempos na linha do tempo do set, em samples
+desde o inicio do set, com as diarias em blocos. O timecode real de cada take
+fica em ``MediaAsset.origin_timecode_samples`` e em ``clip.raw["timecode_samples"]``,
+e ``layout_blocks`` descreve os blocos. Toda sessao de AAF, EDL e XML continua
+com ``layout`` igual a ``ABSOLUTE_LAYOUT`` e o contrato acima.
 """
 
 from __future__ import annotations
@@ -23,6 +30,14 @@ from .timecode import TimecodeRate
 TrackKind = Literal["audio", "aux", "master", "vca", "folder", "video", "midi"]
 FadeKind = Literal["in", "out", "crossfade"]
 MediaStatus = Literal["resolved", "missing", "unsupported"]
+Layout = Literal["absolute", "production_blocks"]
+
+# Tempos absolutos desde 00:00:00:00, o contrato de sempre.
+ABSOLUTE_LAYOUT = "absolute"
+# Som direto: tempos desde o inicio do set, diarias em blocos.
+PRODUCTION_LAYOUT = "production_blocks"
+# Marca das tracks irmas que a expansao de canais acrescenta (``track.raw``).
+EXPANDED_MARK = "expanded"
 
 
 @dataclass(kw_only=True)
@@ -77,6 +92,7 @@ class ClipIR:
     # declara: num WAV estereo do Resolve e o canal do arquivo (1 ou 2); no
     # multi-mono do Avid e o canal da origem, com arquivo de um canal so.
     source_channel: int | None = None
+    color_index: int | None = None
     raw: dict = field(default_factory=dict)
 
     def __post_init__(self) -> None:
@@ -130,6 +146,12 @@ class TrackIR:
     # valor e o pan linear do Live, de 0.0 a 1.0 com 0.5 no centro; a conversao
     # para o Mono Audio Pan do AAF acontece na escrita, nunca aqui.
     pan_points: list[tuple[int, float]] = field(default_factory=list)
+    # Expansao de canais do som direto: nome do grupo do Live da track do
+    # editor e das irmas dela. None fora da expansao.
+    expansion_group: str | None = None
+    color_index: int | None = None
+    organize_group: str | None = None
+    organize_group_color: int | None = None
 
 
 @dataclass(kw_only=True)
@@ -153,6 +175,10 @@ class SessionIR:
     source_application: str | None = None
     # Lido para inspeção/verificação geométrica, mas não exportável sem perda.
     unsupported_export_features: list[str] = field(default_factory=list)
+    # Contrato de tempo da sessao; so o som direto usa PRODUCTION_LAYOUT.
+    layout: Layout = ABSOLUTE_LAYOUT
+    # Blocos do som direto: inicio no set, timecode real, diaria e data.
+    layout_blocks: list[dict] = field(default_factory=list)
 
     def all_clips(self) -> Iterator[ClipIR]:
         for track in self.tracks:

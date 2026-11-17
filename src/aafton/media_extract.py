@@ -30,6 +30,7 @@ import wave
 from pathlib import Path
 
 from .aaf_read_rates import mesma_duracao
+from .bwf_meta import parse_bext as parse_bext  # reexport: chamadores antigos
 from .ir import MediaAsset
 from .report import Report
 
@@ -361,28 +362,6 @@ def write_wav_with_bext(
     body = b"WAVE" + fmt + bext + data
     path.write_bytes(struct.pack("<4sI", b"RIFF", len(body)) + body)
     return path
-
-
-def parse_bext(path: str | Path) -> dict | None:
-    """Le o chunk bext de um WAV. Devolve None quando nao existe."""
-    with Path(path).open("rb") as stream:
-        header = stream.read(12)
-        if header[:4] != b"RIFF" or header[8:12] != b"WAVE":
-            return None
-        while len(chunk := stream.read(8)) == 8:
-            chunk_id, size = struct.unpack("<4sI", chunk)
-            if chunk_id == b"bext":
-                payload = stream.read(min(size, 348))
-                if len(payload) < 348:
-                    raise ValueError("chunk bext truncated")
-                return {
-                    "description": payload[:256].split(b"\x00")[0].decode("ascii", "replace"),
-                    "originator": payload[256:288].split(b"\x00")[0].decode("ascii", "replace"),
-                    "time_reference": struct.unpack("<Q", payload[338:346])[0],
-                    "version": struct.unpack("<H", payload[346:348])[0],
-                }
-            stream.seek(size + (size % 2), 1)
-    return None
 
 
 def file_sha256(path: Path) -> str:

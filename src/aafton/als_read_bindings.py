@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import xml.etree.ElementTree as ET
 from collections import defaultdict
+from collections.abc import Callable
 from dataclasses import dataclass, field
 
 from .ir import SessionIR, TrackIR
@@ -221,8 +222,14 @@ def apply_legacy_channels(track: TrackIR, anchor: Anchor, indice: int) -> None:
         track.source_index = src_idx
 
 
-def infer_channels_from_media(track: TrackIR, session: SessionIR, report: Report) -> None:
-    """Contagem de canais deduzida dos clips ja lidos da faixa."""
+def infer_channels_from_media(
+    track: TrackIR, session: SessionIR, report: Report, mista: Callable | None = None
+) -> None:
+    """Contagem de canais deduzida dos clips ja lidos da faixa.
+
+    ``mista`` recebe a track com arquivos de canais diferentes num set sem
+    sidecar: ali a mistura e uma causa propria da lista de render, nao um aviso.
+    """
     track_channels_set = set()
     for clip in track.clips:
         clip_asset = next((m for m in session.media if m.id == clip.media_id), None)
@@ -230,6 +237,10 @@ def infer_channels_from_media(track: TrackIR, session: SessionIR, report: Report
             track_channels_set.add(clip_asset.channels)
 
     if not track_channels_set:
+        return
+    if len(track_channels_set) > 1 and mista is not None:
+        mista(track)
+        track.channel_count = max(track_channels_set)
         return
     if len(track_channels_set) > 1:
         max_ch = max(track_channels_set)

@@ -9,23 +9,34 @@ from dataclasses import asdict
 from pathlib import Path
 
 from .aaf_read import read_aaf
+from .als_ancora import start_da_linha
 from .als_read import read_session
+from .als_render import recusar_se_parado
 from .bundled import default_template
 from .formats import ADAPTADORES
 from .formats.destino import write_destination
 from .formats.origem import read_origin
 from .ir import SessionIR
 from .ltc import RATES_LTC, parse_ltc_rate
-from .pipeline import PRE_ROLL_SEGUNDOS, ImportOptions, import_session
+from .expandir import planejar, resolve_for_inspect, resumo
+from .pipeline import EXPANSION_INPUT_REFUSED, PRE_ROLL_SEGUNDOS, ImportOptions, import_session
+from .pipeline import media_roots
 from .pipeline import resolve_origin as _resolve_origin
 from .report import Report, StrictModeError, erros_no_stderr
+from .som_direto import is_production_input, read_production
+from .som_direto_tracks import com_os_dois_tempos
+from .som_direto_verify import verify_production
 from .timecode import TimecodeRate, samples_to_label
 from .verify import verify_conversion
+from .cli_organize import OrganizeArgsError, inspect_organize, resolve_organize
+from .cli_locators import add_locators_parser
+from .cli_reconform import add_reconform_parser
 from .cli_ltc import add_ltc_parser
 from . import __version__
 from .cli_parsers import (
     add_app_parser,
     add_audit_audio_parser,
+    add_collect_parser,
     add_export_parser,
     add_import_parser,
     add_inspect_parser,
@@ -41,6 +52,7 @@ __all__ = [
     "build_parser",
     "cmd_app",
     "cmd_audit_audio",
+    "cmd_collect",
     "cmd_export",
     "cmd_import",
     "cmd_inspect",
@@ -138,6 +150,11 @@ def _edl_taxa(texto: str) -> TimecodeRate:
 
 def cmd_import(args: argparse.Namespace) -> int:
     report = Report(strict=not args.permissive)
+    try:
+        organizacao = resolve_organize(args)
+    except OrganizeArgsError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
     options = ImportOptions(
         input=args.input,
         output=args.output,
@@ -145,9 +162,7 @@ def cmd_import(args: argparse.Namespace) -> int:
         live_origin=args.live_origin,
         bpm=args.bpm,
         media=args.media,
-        stereo=args.stereo,
         fades=args.fades,
-        groups=args.groups,
         audio_dir=args.audio_dir,
         video=args.video,
         video_start=args.video_start,
@@ -156,45 +171,148 @@ def cmd_import(args: argparse.Namespace) -> int:
         permissive=args.permissive,
         ltc=args.ltc,
         edl_rate=_taxa_edl(args),
+        **organizacao,
     )
 
-    import_session(options, report)
+    import_session(
+        options,
+        report,
+        circled_only=args.circled_only,
+        production_audio=getattr(args, "production_audio", None),
+    )
 
     _write_report(report, args.report)
     print(report.to_markdown())
     return 1 if report.incomplete else 0
 
 
+def _opcoes_do_set(args: argparse.Namespace) -> dict:
+    """Inicio e clips de render de um set sem registro do aafton, vindos da linha."""
+    return {
+        "start": start_da_linha(getattr(args, "start_tc", None), getattr(args, "frame_rate", None)),
+        "leave_out_render": bool(getattr(args, "leave_out_render", False)),
+    }
+
+
+def _taxa_de_frames(texto: str) -> TimecodeRate:
+    """Taxa de frames de --frame-rate; 29.97df e drop frame."""
+    try:
+        return parse_ltc_rate(texto)
+    except ValueError:
+        raise argparse.ArgumentTypeError(
+            f"unknown frame rate: {texto!r}; use {', '.join(RATES_LTC)}"
+        ) from None
+
+
+def _add_set_options(sub) -> None:
+    """--start-tc, --frame-rate e --leave-out-render em export, verify e inspect."""
+    for nome in ("export", "verify", "inspect"):
+        parser = sub.choices[nome]
+        parser.add_argument(
+            "--start-tc",
+            default=None,
+            metavar="TC",
+            help="timecode of bar 1 of a set without an aafton record (default 01:00:00:00)",
+        )
+        parser.add_argument(
+            "--frame-rate",
+            type=_taxa_de_frames,
+            default=None,
+            help=f"timecode rate of --start-tc: {', '.join(RATES_LTC)} (default 24)",
+        )
+        parser.add_argument(
+            "--leave-out-render",
+            action="store_true",
+            help="leaves out the clips that need a render in Live (warp, loop, transpose)",
+        )
+
+
 def cmd_export(args: argparse.Namespace) -> int:
     report = Report(strict=not args.permissive)
-    session = read_session(args.input, report)
+    session = read_session(args.input, report, **_opcoes_do_set(args))
+    recusar_se_parado(report)
     write_destination(session, args.output, report, media=args.media)
     _write_report(report, args.report)
     print(report.to_markdown())
     return 1 if report.incomplete else 0
 
 
+def _print_json(dados: dict) -> None:
+    """JSON em UTF-8 no stdout, mesmo redirecionado num console que nao e UTF-8.
+
+    No Windows o stdout redirecionado usa a pagina de codigo do sistema, e um
+    nome acentuado quebrava em ``charmap``: os bytes UTF-8 vao direto para o
+    buffer quando ele existe.
+    """
+    texto = json.dumps(dados, ensure_ascii=False, indent=2) + "\n"
+    buffer = getattr(sys.stdout, "buffer", None)
+    if buffer is None:
+        sys.stdout.write(texto)
+        return
+    sys.stdout.flush()
+    buffer.write(texto.encode("utf-8"))
+    buffer.flush()
+
+
+def _inspect_expansion(args: argparse.Namespace, caminho: Path, report: Report) -> int:
+    """Inspect com --production-audio: por take, o original casado e as entradas acrescentadas."""
+    if is_production_input(caminho):
+        raise ValueError(EXPANSION_INPUT_REFUSED)
+    if not Path(args.production_audio).is_dir():
+        raise ValueError(f"the production audio folder {args.production_audio} does not exist")
+    session = read_origin(caminho, report, edl_rate=_taxa_edl(args))
+    resolve_for_inspect(session, media_roots(str(caminho), args.audio_dir), report)
+    dados = _session_to_dict(session)
+    dados["production_audio"] = resumo(planejar(session, args.production_audio))
+    _print_json(dados)
+    return 0
+
+
 def cmd_inspect(args: argparse.Namespace) -> int:
     report = Report(strict=False)
     caminho = Path(args.input)
     sufixo = caminho.suffix.lower()
+    if getattr(args, "production_audio", None):
+        return _inspect_expansion(args, caminho, report)
+    if getattr(args, "organize", None):
+        return inspect_organize(args)
+    if is_production_input(caminho):
+        session = read_production(caminho, report)
+        _print_json(com_os_dois_tempos(session, _session_to_dict(session)))
+        return 0
     if sufixo == ".aaf":
         session = read_aaf(caminho, report)
     elif sufixo == ".als":
-        session = read_session(caminho, report)
+        session = read_session(caminho, report, allow_production=True, **_opcoes_do_set(args))
     elif sufixo in ADAPTADORES:
         session = read_origin(caminho, report, edl_rate=_taxa_edl(args))
     else:
         print(f"unrecognized extension: {caminho.suffix}", file=sys.stderr)
         return 2
-    print(json.dumps(_session_to_dict(session), ensure_ascii=False, indent=2))
+    _print_json(_session_to_dict(session))
     return erros_no_stderr(report) if sufixo in ADAPTADORES else 0
 
 
+def _inicio_do_verify(args: argparse.Namespace):
+    """Inicio vindo da linha para o verify; None quando nada foi passado."""
+    start_tc = getattr(args, "start_tc", None)
+    frame_rate = getattr(args, "frame_rate", None)
+    if start_tc is None and frame_rate is None:
+        return None
+    return start_da_linha(start_tc, frame_rate)
+
+
 def cmd_verify(args: argparse.Namespace) -> int:
-    resultado = verify_conversion(
-        args.aaf, args.als, override_tolerance_samples=args.tolerance_samples
-    )
+    if is_production_input(args.aaf):
+        resultado = verify_production(args.aaf, args.als)
+    else:
+        resultado = verify_conversion(
+            args.aaf,
+            args.als,
+            override_tolerance_samples=args.tolerance_samples,
+            start=_inicio_do_verify(args),
+            leave_out_render=bool(getattr(args, "leave_out_render", False)),
+        )
     print(resultado.to_table())
     if args.report:
         Path(args.report).write_text(resultado.to_markdown(), encoding="utf-8")
@@ -234,7 +352,6 @@ def cmd_turnover(args: argparse.Namespace) -> int:
     try:
         res = create_turnover_package(
             session_file=args.session,
-            media_dir=args.media_dir,
             output_dir=args.output,
             session_name=args.name,
             strict=not args.permissive,
@@ -250,6 +367,35 @@ def cmd_turnover(args: argparse.Namespace) -> int:
     except TurnoverError as exc:
         print(f"error in the turnover: {exc}", file=sys.stderr)
         return 1
+
+
+def cmd_collect(args: argparse.Namespace) -> int:
+    from .collect import CollectError, run_collect
+
+    seen_files: set[str] = set()
+
+    def _progress(copied: int, total: int, filename: str) -> None:
+        if filename not in seen_files:
+            seen_files.add(filename)
+            print(f"copying {filename} ({copied}/{total} bytes)", file=sys.stderr)
+
+    try:
+        res = run_collect(
+            args.source,
+            args.dest,
+            name=args.name,
+            include_video=not args.no_video,
+            progress=_progress,
+        )
+    except CollectError as exc:
+        print(f"error in the collect: {exc}", file=sys.stderr)
+        return 2
+
+    if args.json:
+        _print_json(res.report.to_dict())
+    else:
+        print(res.report.to_markdown())
+    return res.exit_code
 
 
 def cmd_ui(args: argparse.Namespace) -> int:
@@ -295,10 +441,14 @@ def build_parser() -> argparse.ArgumentParser:
     add_export_parser(sub, cmd_export)
     add_inspect_parser(sub, cmd_inspect, _edl_taxa, RATES_LTC)
     add_verify_parser(sub, cmd_verify)
+    _add_set_options(sub)
     add_audit_audio_parser(sub, cmd_audit_audio)
     add_turnover_parser(sub, cmd_turnover)
+    add_collect_parser(sub, cmd_collect)
 
     add_ltc_parser(sub)
+    add_locators_parser(sub)
+    add_reconform_parser(sub)
 
     return parser
 

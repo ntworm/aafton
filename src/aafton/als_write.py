@@ -44,7 +44,7 @@ from .als_write_clips import (
     sanitize_sample_ref as sanitize_sample_ref,
 )
 
-from .als_write_groups import infer_track_groups
+from .als_write_groups import expansion_groups, infer_track_groups, organize_groups
 from .als_write_locators import write_locators
 from .als_write_sidecar import write_anchor_sidecar
 from .als_write_tracks import WriteContext, emit_tracks
@@ -166,6 +166,7 @@ def _build_context(
     clip_prototype: ET.Element,
     gain_envelope_prototype: ET.Element | None,
     next_track_id: int,
+    output_path: str | Path,
 ) -> WriteContext:
     return WriteContext(
         session=session,
@@ -187,17 +188,24 @@ def _build_context(
         track_bindings=[],
         audio_track_idx=0,
         clip_ranges=[],
+        # A pasta do set: a midia que esta dentro dela e escrita com o
+        # caminho relativo, para a pasta copiada continuar achando os
+        # arquivos que ela leva junto.
+        als_dir=Path(output_path).resolve().parent,
     )
 
 
 def _report_track_groups(ctx: WriteContext, options: WriteOptions, report: Report) -> None:
-    if options.groups == "prefix" and ctx.created_groups:
+    # Os grupos da expansao de canais e da organizacao vem do IR, nao do prefixo: ficam fora da nota.
+    do_ir = set(expansion_groups(ctx.session).values()) | set(organize_groups(ctx.session).values())
+    prefixos = [g for g in ctx.created_groups if g not in do_ir]
+    if options.groups == "prefix" and prefixos:
         msg = "Grouping by prefix rebuilt folders from the track names (the AAF has no folders): "
-        group_to_count = {g: 0 for g in ctx.created_groups}
+        group_to_count = {g: 0 for g in prefixos}
         for t_id, g in ctx.track_to_group.items():
-            if g in ctx.created_groups:
+            if g in group_to_count:
                 group_to_count[g] += 1
-        details = [f"{prefix} ({group_to_count[prefix]} tracks)" for prefix in ctx.created_groups]
+        details = [f"{prefix} ({group_to_count[prefix]} tracks)" for prefix in prefixos]
         msg += ", ".join(details)
         msg += f". {ctx.total_soltas} loose tracks."
         report.info("TRACK_GROUPS_RECONSTRUCTED", msg)
@@ -274,6 +282,7 @@ def write_session(
         clip_prototype,
         gain_envelope_prototype,
         next_track_id,
+        output_path,
     )
     emit_tracks(ctx)
 

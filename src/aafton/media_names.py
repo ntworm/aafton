@@ -67,3 +67,20 @@ def stereo_output_name(extract_dir: Path, prefix: str, digest: str) -> str:
     if utf16_len(limpo) > orcamento:
         limpo = truncate_utf16(limpo, orcamento).rstrip(". ")
     return f"{limpo}{sufixo}"
+
+
+_EXTENSOES_DE_AUDIO = (".wav", ".wave", ".bwf", ".aif", ".aiff")
+
+
+def sem_extensao_de_audio(nome: str | None) -> str | None:
+    """Tira a extensao de audio do nome do MasterMob.
+
+    O export do aafton e outros programas chamam o MasterMob de ``X.wav``; a
+    essencia extraida ja ganha ``.wav``, e sem isto o arquivo sairia ``X.wav.wav``.
+    """
+    if not nome:
+        return nome
+    for extensao in _EXTENSOES_DE_AUDIO:
+        if nome.lower().endswith(extensao) and len(nome) > len(extensao):
+            return nome[: -len(extensao)]
+    return nome

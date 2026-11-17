@@ -22,7 +22,7 @@ import aaf2
 
 from .ir import SessionIR
 from .report import Report
-from .timecode import TimecodeRate, frames_to_samples_exact, quantize_samples
+from .timecode import TimecodeRate, exact_edit_rate, frames_to_samples_exact, quantize_samples
 
 from .aaf_read_components import (
     _AUDIO_CHANNEL_COMBINER_AUID as _AUDIO_CHANNEL_COMBINER_AUID,
@@ -70,6 +70,8 @@ from .aaf_read_session import (
     _read_timecode as _read_timecode,
     _resolve_track_names as _resolve_track_names,
     _session_sample_rate as _session_sample_rate,
+    _slot_de_som,
+    _taxas_dos_descritores,
     check_frame_alignment as check_frame_alignment,
     check_plugins as check_plugins,
     check_pulldown as check_pulldown,
@@ -244,6 +246,92 @@ def _escolher_composition(f, path: Path, report: Report, sample_rate: int):
     return composicoes[0]
 
 
+def _edit_rate_inteiro(edit_rate) -> int | None:
+    """Converte edit_rate para taxa inteira em Hz se > 1000, senao None."""
+    if edit_rate is None:
+        return None
+    try:
+        frac = exact_edit_rate(edit_rate)
+    except (TypeError, ValueError):
+        return None
+    if frac.denominator != 1 or frac.numerator <= 1000:
+        return None
+    return int(frac.numerator)
+
+
+def _slot_de_som_timeline(slot) -> bool:
+    """Indica se o slot de timeline da CompositionMob e de audio."""
+    if _type_name(slot) != "TimelineMobSlot":
+        return False
+    segment = getattr(slot, "segment", None)
+    if segment is None or _type_name(segment) == "Timecode":
+        return False
+    return _slot_de_som(slot, segment)
+
+
+def _taxa_dos_slots_de_audio(composition) -> int | None:
+    """Edit rate unanime dos slots de audio (>1000 Hz), ou None se divergirem."""
+    taxas: set[int] = set()
+    for slot in getattr(composition, "slots", []) or []:
+        if not _slot_de_som_timeline(slot):
+            continue
+        taxa = _edit_rate_inteiro(getattr(slot, "edit_rate", None))
+        if taxa is None:
+            return None
+        taxas.add(taxa)
+    if len(taxas) == 1:
+        return next(iter(taxas))
+    return None
+
+
+_TAXAS_AUDIO_PADRAO = {
+    8000,
+    11025,
+    16000,
+    22050,
+    32000,
+    44100,
+    48000,
+    88200,
+    96000,
+    176400,
+    192000,
+    352800,
+    384000,
+}
+
+
+def _slot_rate_confirmada(comp, taxas: dict[int, int]) -> int | None:
+    """Taxa unanime dos slots de audio se for taxa padrao ou declarada por descritor."""
+    slot_rate = _taxa_dos_slots_de_audio(comp)
+    if slot_rate is None:
+        return None
+    # Edit_rate padrao de audio vale mesmo sem descritor restante (ex.: set
+    # misto onde os clips na taxa da sessao ficaram de fora); inteiros
+    # nao padrao (ex.: 2997) ainda exigem confirmacao em algum descritor.
+    if slot_rate in _TAXAS_AUDIO_PADRAO or slot_rate in taxas:
+        return slot_rate
+    return None
+
+
+def _escolher_composicao_e_taxa(f, path: Path, report: Report):
+    """Escolhe CompositionMob e taxa da sessao sem dependencia circular.
+
+    Parte da maioria dos descritores para ranquear a composicao, le os slots
+    de audio e so refaz a escolha se eles impuserem outra taxa unanime.
+    """
+    taxas = _taxas_dos_descritores(f)
+    taxa_inicial = max(taxas, key=lambda k: taxas[k]) if taxas else 48000
+    comp = _escolher_composition(f, path, report, taxa_inicial)
+    if comp is None:
+        return None, _session_sample_rate(f, report)
+    slot_rate = _slot_rate_confirmada(comp, taxas)
+    if slot_rate is not None and slot_rate != taxa_inicial:
+        comp = _escolher_composition(f, path, report, slot_rate)
+        slot_rate = _slot_rate_confirmada(comp, taxas)
+    return comp, _session_sample_rate(f, report, slot_rate=slot_rate)
+
+
 def _iniciar_sessao(composition, path: Path, report: Report, sample_rate: int):
     """Le o timecode de inicio e monta o SessionIR da sessao."""
     frames_inicio, rate = _read_timecode(composition, report)
@@ -339,8 +427,7 @@ def read_aaf(
     """Le um AAF e devolve o SessionIR em samples absolutos."""
     path = Path(path)
     with aaf2.open(str(path), "r") as f:
-        sample_rate = _session_sample_rate(f, report)
-        composition = _escolher_composition(f, path, report, sample_rate)
+        composition, sample_rate = _escolher_composicao_e_taxa(f, path, report)
         if composition is None:
             return _sessao_vazia(path, sample_rate)
 

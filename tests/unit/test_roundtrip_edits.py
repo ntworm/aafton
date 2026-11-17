@@ -438,7 +438,7 @@ def test_r1_gain_points_sem_cortes_internos_avalia_inicio_e_emite_um_trecho(tmp_
         assert clip_bordas.gain_linear == pytest.approx(0.75)
 
 
-def test_r2_transicao_conflitante_com_automacao_recusada(tmp_path):
+def test_r2_transicao_com_automacao_no_overlap_e_gravada(tmp_path):
     """Se cortes de automacao caem na regiao de overlap da transicao,
 
     recusa com WRITE_TRANSITION_SEGMENTED_AUTOMATION_UNSUPPORTED e protege
@@ -497,22 +497,13 @@ def test_r2_transicao_conflitante_com_automacao_recusada(tmp_path):
         media=[asset],
     )
 
-    # Modo estrito recusa
+    # Cada clip vai inteiro com o proprio envelope: o ponto dentro do overlap nao
+    # impede a Transition, e o modo estrito grava os dois clips.
     rep_strict = Report(strict=True)
-    with pytest.raises(Exception):
-        write_aaf(session_conflict, tmp_path / "r2_strict.aaf", rep_strict)
-
-    # Modo permissivo relata erro e nao corrompe Sequence
-    dest_permissive = tmp_path / "r2_permissive.aaf"
-    rep_permissive = Report(strict=False)
-    write_aaf(session_conflict, dest_permissive, rep_permissive)
-    conflict_issues = [
-        i
-        for i in rep_permissive.issues
-        if i.code == "WRITE_TRANSITION_SEGMENTED_AUTOMATION_UNSUPPORTED"
-    ]
-    assert len(conflict_issues) == 1
-    assert conflict_issues[0].context["overlap_samples"] == overlap
+    write_aaf(session_conflict, tmp_path / "r2_strict.aaf", rep_strict)
+    codigos = [i.code for i in rep_strict.issues]
+    assert "WRITE_CLIP_SKIPPED" not in codigos
+    assert "WRITE_OVERLAP" not in codigos
 
     # Sem conflito (cortes fora do overlap): transicao valida
     track_ok = TrackIR(id="t0", source_index=0, name="AUDIO 1", kind="audio", channel_count=1)

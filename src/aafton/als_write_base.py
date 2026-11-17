@@ -107,6 +107,17 @@ def samples_to_beats(samples: int, sample_rate: int, bpm: float, side: str = TIM
     return max(usable, key=score)
 
 
+def source_seconds(samples: int, sample_rate: int) -> float:
+    """Segundos do arquivo para os marcadores de loop de um clip sem warp.
+
+    Num clip de audio sem warp o Live grava LoopStart, LoopEnd e HiddenLoopEnd
+    em segundos do arquivo, em qualquer tempo do set (medido em 15/11/2026).
+    Segundo e o beat a 60 BPM, entao a mesma busca de double serve, do lado da
+    fonte.
+    """
+    return samples_to_beats(samples, sample_rate, 60.0, SOURCE)
+
+
 def to_beats(
     abs_samples: int,
     live_origin_samples: int | None,

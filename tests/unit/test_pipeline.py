@@ -45,6 +45,10 @@ CAMPOS_DE_IMPORT = [
     "permissive",
     "ltc",
     "edl_rate",
+    "organize",
+    "certainty",
+    "organize_signals",
+    "organize_edits",
 ]
 
 AUTOMACAO_DIALOGO = "automacao de 'DIALOGO 1' ainda nao e reconciliada para exportacao"

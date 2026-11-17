@@ -320,7 +320,7 @@ def _exporta_o_als(als1, aaf_out, relatorio):
     cmd_export = ["export", str(als1), str(aaf_out), "--permissive", "--report", str(relatorio)]
     codigo_export = main(cmd_export)
     assert aaf_out.exists()
-    assert codigo_export == 1
+    assert codigo_export == 0
     return codigo_export
 
 

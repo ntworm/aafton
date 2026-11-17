@@ -1,22 +1,59 @@
 """Gerador de pacote de turnover autocontido para entrega de pos-producao.
 
-Cria uma pasta de entrega atômica contendo a sessao (AAF ou ALS), o sidecar
-de ancoragem, as midias de audio verificadas pelo oraculo, um manifesto criptografico
-SHA-256 (manifest.json) e um relatorio tecnico legivel (turnover_report.txt).
+Cria uma pasta de entrega atomica contendo a sessao (AAF ou ALS), o sidecar
+de ancoragem quando houver, as midias de audio e video copiadas e relinkadas,
+o manifesto criptografico SHA-256 (manifest.json) e o relatorio tecnico
+legivel (turnover_report.txt).
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass, replace
-from datetime import datetime, timezone
+import gzip
 import json
-from pathlib import Path
-import shutil
-import tempfile
 import re
+import struct
+import tempfile
+import urllib.parse
+import xml.etree.ElementTree as ET
+import zlib
+from dataclasses import dataclass
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any
 
-from .media_oracle import verify_session_media
+import aaf2.exceptions
+
+from .collect import CollectPlan, CollectPlanItem, plan_collect
+from .collect_aaf import rewrite_aaf_locators
+from .collect_als import rewrite_als_xml
+from .collect_copy import CollectError, assign_dest_names, norm_path_key
 from .media_extract import file_sha256
+from .sidecar import resolve_video_path, sidecar_path_for
+from .turnover_media import (
+    _classify_media_items,
+    _copy_ready_items,
+    _expected_hashes_for,
+)
+from .turnover_report import build_manifest_data, build_report_text
+
+_INVALID_NAME = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
+
+CATCHABLE_ERRORS = (
+    CollectError,
+    ET.ParseError,
+    gzip.BadGzipFile,
+    EOFError,
+    OSError,
+    zlib.error,
+    json.JSONDecodeError,
+    UnicodeDecodeError,
+    ValueError,
+    struct.error,
+    NotImplementedError,
+    KeyError,
+    AttributeError,
+    aaf2.exceptions.AAFError,
+)
 
 
 class TurnoverError(RuntimeError):
@@ -37,316 +74,405 @@ class TurnoverResult:
     session_path: Path
     sidecar_path: Path | None
     media_count: int
-    manifest_data: dict
+    manifest_data: dict[str, Any]
     is_valid: bool
+
+
+def _rewrite_video_path(
+    source_sidecar_data: dict[str, Any],
+    source: Path,
+    ready_items: list[CollectPlanItem],
+    dest_name_map: dict[str, str],
+) -> str | None:
+    """Reescreve video_path apenas quando o video do sidecar corresponder a item copiado."""
+    video_path = source_sidecar_data.get("video_path")
+    if not video_path:
+        return video_path
+    resolved_video_key = norm_path_key(resolve_video_path(video_path, source))
+    for it in ready_items:
+        if it.kind == "video" and it.resolved_key == resolved_video_key:
+            return f"media/{dest_name_map[it.resolved_key]}"
+    return video_path
+
+
+def _build_package_media_hashes(
+    ready_items: list[CollectPlanItem],
+    dest_name_map: dict[str, str],
+    expected_map: dict[str, str | None],
+    copy_hashes: dict[str, str],
+) -> dict[str, str]:
+    """Monta o mapa de media_hashes portateis para os audios copiados."""
+    pkg_hashes: dict[str, str] = {}
+    for it in ready_items:
+        if it.kind == "video":
+            continue
+        dest_name = dest_name_map[it.resolved_key]
+        is_wav = Path(it.source).suffix.lower() in (".wav", ".wave")
+        exp_h = expected_map.get(it.resolved_key)
+        if is_wav:
+            pkg_hashes[dest_name] = exp_h or copy_hashes[it.resolved_key]
+        elif exp_h is not None:
+            pkg_hashes[dest_name] = exp_h
+    return pkg_hashes
+
+
+def _write_sidecar_for_package(
+    source_sidecar_data: dict[str, Any],
+    stage_sidecar: Path,
+    source: Path,
+    ready_items: list[CollectPlanItem],
+    dest_name_map: dict[str, str],
+    expected_map: dict[str, str | None],
+    copy_hashes: dict[str, str],
+) -> None:
+    """Reescreve o sidecar para o pacote com video_path e media_hashes portateis."""
+    data = dict(source_sidecar_data)
+    rewritten_video = _rewrite_video_path(source_sidecar_data, source, ready_items, dest_name_map)
+    if rewritten_video is not None:
+        data["video_path"] = rewritten_video
+
+    data["media_hashes"] = _build_package_media_hashes(
+        ready_items, dest_name_map, expected_map, copy_hashes
+    )
+    stage_sidecar.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+
+
+def _verify_staging_session(stage_session: Path, staging: Path, expected_ready_count: int) -> None:
+    """Verifica se a sessao reescrita no staging rele todas as midias internamente."""
+    staged_plan = plan_collect(stage_session)
+    staged_ready = [it for it in staged_plan.items if it.state == "ready"]
+    if len(staged_ready) != expected_ready_count:
+        msg = (
+            f"staging session verification failed: expected {expected_ready_count} ready items, "
+            f"found {len(staged_ready)}"
+        )
+        raise TurnoverError(msg)
+    for it in staged_ready:
+        src_path = Path(it.source).resolve()
+        if not src_path.is_relative_to(staging.resolve()):
+            msg = f"staging session verification failed: media {it.source} is outside staging"
+            raise TurnoverError(msg)
+
+
+def _collect_staging_files(staging: Path) -> dict[str, dict[str, Any]]:
+    """Mapeia os arquivos do staging para o manifesto com SHA-256 e tamanho."""
+    files_map: dict[str, dict[str, Any]] = {}
+    for p in sorted(staging.rglob("*")):
+        if p.is_file():
+            rel = p.relative_to(staging).as_posix()
+            if rel in ("manifest.json", "turnover_report.txt"):
+                continue
+            files_map[rel] = {
+                "sha256": file_sha256(p),
+                "size_bytes": p.stat().st_size,
+            }
+    return files_map
+
+
+def _session_url_for(p: Path, target: Path) -> str:
+    """Gera a URL relativa para locators de AAF no pacote de turnover."""
+    try:
+        rel = p.relative_to(target).as_posix()
+    except ValueError:
+        rel = f"media/{p.name}"
+    return "file:" + urllib.parse.quote(rel)
+
+
+def _rewrite_session_files(
+    plan: CollectPlan,
+    source: Path,
+    stage_session: Path,
+    target: Path,
+    ready_items: list[CollectPlanItem],
+    dest_name_map: dict[str, str],
+) -> None:
+    """Reescreve os locators ou FileRefs da sessao no staging."""
+    final_paths = {
+        it.resolved_key: target / "media" / dest_name_map[it.resolved_key] for it in ready_items
+    }
+    if plan.source_format == "als":
+        rewrite_als_xml(source, stage_session, "media", final_paths)
+    else:
+        rewrite_aaf_locators(
+            source,
+            stage_session,
+            final_paths,
+            url_for=lambda p: _session_url_for(p, target),
+        )
+
+
+def _read_source_sidecar(
+    plan: CollectPlan, source: Path
+) -> tuple[Path | None, dict[str, Any] | None, dict[str, str] | None]:
+    """Le o sidecar da sessao de origem quando existir."""
+    if plan.source_format != "als" or not plan.has_sidecar:
+        return None, None, None
+    sidecar_path = sidecar_path_for(source)
+    sidecar_data = json.loads(sidecar_path.read_text(encoding="utf-8"))
+    return sidecar_path, sidecar_data, sidecar_data.get("media_hashes")
+
+
+def _raise_strict(counts: dict[str, int]) -> None:
+    """Dispara TurnoverValidationError em modo estrito se o pacote for invalido."""
+    if counts["corrupt"] > 0 or counts["missing"] > 0 or counts["hash_mismatch"] > 0:
+        raise TurnoverValidationError(
+            f"Turnover failed media verification in strict mode: "
+            f"{counts['missing']} missing, {counts['corrupt']} corrupt, "
+            f"{counts['hash_mismatch']} hash mismatch."
+        )
+    raise TurnoverValidationError("Turnover failed in strict mode: no media copied or embedded.")
+
+
+def _write_manifest_and_report(
+    *,
+    staging: Path,
+    name: str,
+    source: Path,
+    sidecar_name: str | None,
+    timestamp_iso: str,
+    media_items: list[dict[str, Any]],
+    counts: dict[str, int],
+    is_valid: bool,
+    files_map: dict[str, dict[str, Any]],
+    discarded_keys: list[str],
+) -> dict[str, Any]:
+    """Grava manifest.json e turnover_report.txt no staging e retorna os dados do manifesto."""
+    manifest_data = build_manifest_data(
+        session_name=name,
+        session_file=source.name,
+        sidecar_file=sidecar_name,
+        created_at=timestamp_iso,
+        files_map=files_map,
+        media_items=media_items,
+        counts=counts,
+        is_valid=is_valid,
+    )
+    (staging / "manifest.json").write_text(
+        json.dumps(manifest_data, indent=2, ensure_ascii=False), encoding="utf-8"
+    )
+    report_text = build_report_text(
+        session_name=name,
+        created_at=timestamp_iso,
+        session_file=source.name,
+        sidecar_file=sidecar_name,
+        is_valid=is_valid,
+        counts=counts,
+        media_items=media_items,
+        files_map=files_map,
+        discarded_keys=discarded_keys,
+    )
+    (staging / "turnover_report.txt").write_text(report_text, encoding="utf-8")
+    return manifest_data
+
+
+def _copy_and_rewrite_staging(
+    plan: CollectPlan,
+    source: Path,
+    target: Path,
+    staging: Path,
+    ready_items: list[CollectPlanItem],
+    dest_name_map: dict[str, str],
+) -> tuple[dict[str, str], dict[str, int], Path]:
+    """Copia as midias e reescreve os arquivos da sessao na pasta de staging."""
+    staging_media = staging / "media"
+    staging_media.mkdir(parents=True, exist_ok=True)
+    copy_hashes, copy_sizes = _copy_ready_items(ready_items, staging_media, dest_name_map)
+    stage_session = staging / source.name
+    _rewrite_session_files(plan, source, stage_session, target, ready_items, dest_name_map)
+    return copy_hashes, copy_sizes, stage_session
+
+
+def _stage_sidecar_if_present(
+    sidecar_data: dict[str, Any] | None,
+    sidecar_path: Path | None,
+    staging: Path,
+    source: Path,
+    ready_items: list[CollectPlanItem],
+    dest_name_map: dict[str, str],
+    expected_map: dict[str, str | None],
+    copy_hashes: dict[str, str],
+) -> None:
+    """Escreve o sidecar portatil no staging se a sessao de origem tiver ancoragem."""
+    if sidecar_data is not None and sidecar_path is not None:
+        stage_sidecar = staging / sidecar_path.name
+        _write_sidecar_for_package(
+            sidecar_data,
+            stage_sidecar,
+            source,
+            ready_items,
+            dest_name_map,
+            expected_map,
+            copy_hashes,
+        )
+
+
+def _build_turnover_result(
+    *,
+    target: Path,
+    source: Path,
+    sidecar_name: str | None,
+    counts: dict[str, int],
+    manifest_data: dict[str, Any],
+    is_valid: bool,
+) -> TurnoverResult:
+    """Monta o objeto TurnoverResult final."""
+    media_count = counts["copied"] + counts["corrupt"] + counts["hash_mismatch"]
+    sidecar_target = target / sidecar_name if sidecar_name else None
+    return TurnoverResult(
+        package_dir=target,
+        manifest_path=target / "manifest.json",
+        report_path=target / "turnover_report.txt",
+        session_path=target / source.name,
+        sidecar_path=sidecar_target,
+        media_count=media_count,
+        manifest_data=manifest_data,
+        is_valid=is_valid,
+    )
+
+
+def _generate_manifest_and_report(
+    *,
+    staging: Path,
+    name: str,
+    source: Path,
+    sidecar_path: Path | None,
+    media_items: list[dict[str, Any]],
+    counts: dict[str, int],
+    is_valid: bool,
+    discarded_keys: list[str],
+) -> tuple[dict[str, Any], str | None]:
+    """Coleta arquivos, grava manifest/report e devolve o manifesto e nome do sidecar."""
+    files_map = _collect_staging_files(staging)
+    timestamp_iso = datetime.now(timezone.utc).isoformat()
+    sidecar_name = sidecar_path.name if sidecar_path else None
+    manifest_data = _write_manifest_and_report(
+        staging=staging,
+        name=name,
+        source=source,
+        sidecar_name=sidecar_name,
+        timestamp_iso=timestamp_iso,
+        media_items=media_items,
+        counts=counts,
+        is_valid=is_valid,
+        files_map=files_map,
+        discarded_keys=discarded_keys,
+    )
+    return manifest_data, sidecar_name
+
+
+def _do_build_turnover_in_staging(
+    source: Path,
+    name: str,
+    target: Path,
+    staging: Path,
+    strict: bool,
+) -> TurnoverResult:
+    """Executa a construcao do pacote na pasta temporaria de staging."""
+    plan = plan_collect(source)
+    sidecar_path, sidecar_data, media_hashes = _read_source_sidecar(plan, source)
+
+    ready_items = [it for it in plan.items if it.state == "ready"]
+    dest_name_map = assign_dest_names([it.source for it in ready_items])
+    expected_map, discarded_keys = _expected_hashes_for(media_hashes, ready_items, source.parent)
+
+    copy_hashes, copy_sizes, stage_session = _copy_and_rewrite_staging(
+        plan, source, target, staging, ready_items, dest_name_map
+    )
+    _stage_sidecar_if_present(
+        sidecar_data,
+        sidecar_path,
+        staging,
+        source,
+        ready_items,
+        dest_name_map,
+        expected_map,
+        copy_hashes,
+    )
+
+    staging_media = staging / "media"
+    media_items, counts, is_valid = _classify_media_items(
+        plan, staging_media, dest_name_map, expected_map, copy_hashes, copy_sizes
+    )
+    _verify_staging_session(stage_session, staging, len(ready_items))
+
+    if strict and not is_valid:
+        _raise_strict(counts)
+
+    manifest_data, sidecar_name = _generate_manifest_and_report(
+        staging=staging,
+        name=name,
+        source=source,
+        sidecar_path=sidecar_path,
+        media_items=media_items,
+        counts=counts,
+        is_valid=is_valid,
+        discarded_keys=discarded_keys,
+    )
+
+    return _build_turnover_result(
+        target=target,
+        source=source,
+        sidecar_name=sidecar_name,
+        counts=counts,
+        manifest_data=manifest_data,
+        is_valid=is_valid,
+    )
+
+
+def _build_turnover_in_staging(
+    source: Path,
+    name: str,
+    target: Path,
+    staging: Path,
+    strict: bool,
+) -> TurnoverResult:
+    """Executa a criacao com tratamento e envelopamento em TurnoverError."""
+    try:
+        return _do_build_turnover_in_staging(source, name, target, staging, strict)
+    except TurnoverError:
+        raise
+    except CATCHABLE_ERRORS as exc:
+        raise TurnoverError(str(exc)) from exc
+
+
+def _validate_package_name(name: str) -> None:
+    """Valida se o nome do pacote e seguro para arquivos e pastas."""
+    if not name or _INVALID_NAME.search(name) or name in {".", ".."}:
+        raise TurnoverError(f"invalid session name: {name!r}")
+
+
+def _resolve_target_dir(source: Path, name: str, output_dir: str | Path | None) -> Path:
+    """Resolve o diretorio final e garante que nao exista previamente."""
+    if output_dir is not None:
+        target = Path(output_dir).resolve()
+    else:
+        target = source.parent / f"{name}_turnover"
+    if target.exists() or target.is_symlink():
+        raise TurnoverError(
+            "destination already exists; preserve the previous delivery "
+            f"and choose another folder: {target}"
+        )
+    return target
 
 
 def create_turnover_package(
     session_file: str | Path,
-    media_dir: str | Path | None = None,
     output_dir: str | Path | None = None,
     session_name: str | None = None,
     strict: bool = True,
 ) -> TurnoverResult:
-    """Publica a pasta somente após copiar, relinkar e conferir seus arquivos."""
+    """Cria um pacote de turnover autocontido com sessao, midias, manifesto e relatorio."""
     source = Path(session_file).resolve()
     name = session_name or source.stem
-    if not name or re.search(r'[<>:"/\\|?*\x00-\x1f]', name) or name in {".", ".."}:
-        raise TurnoverError("invalid session name")
-    target = (
-        Path(output_dir).resolve() if output_dir is not None else source.parent / f"{name}_turnover"
-    )
-    if target.exists() or target.is_symlink():
-        raise TurnoverError(
-            f"destination already exists; preserve the previous delivery and choose another folder: {target}"
-        )
+    _validate_package_name(name)
+    target = _resolve_target_dir(source, name, output_dir)
     target.parent.mkdir(parents=True, exist_ok=True)
+
     with tempfile.TemporaryDirectory(prefix=".turnover-", dir=target.parent) as temporary:
         staging = Path(temporary) / "package"
-        result = _build_turnover_package(source, media_dir, staging, name, strict)
+        staging.mkdir(parents=True, exist_ok=True)
+        res = _build_turnover_in_staging(source, name, target, staging, strict)
+        if target.is_dir():
+            target.rmdir()
         staging.rename(target)
-    return replace(
-        result,
-        package_dir=target,
-        manifest_path=target / result.manifest_path.name,
-        report_path=target / result.report_path.name,
-        session_path=target / result.session_path.name,
-        sidecar_path=target / result.sidecar_path.name if result.sidecar_path else None,
-    )
-
-
-def _iter_descriptors(descriptor, seen=None):
-    if seen is None:
-        seen = set()
-    if descriptor is None or id(descriptor) in seen:
-        return
-    seen.add(id(descriptor))
-    yield descriptor
-    children = descriptor.get("FileDescriptors")
-    if children:
-        for child in children.value:
-            yield from _iter_descriptors(child, seen)
-
-
-def _relink_session(session: Path, source: Path, package: Path, copied: dict[str, Path]) -> None:
-    """Referências internas permanecem relativas quando a pasta é movida."""
-
-    def relative(raw: str) -> str:
-        from .aaf_read import _url_para_caminho
-
-        candidate = Path(_url_para_caminho(raw))
-        target = copied.get(candidate.name.casefold())
-        if target is None:
-            raise TurnoverValidationError(
-                f"referenced media not copied for turnover: {candidate.name}"
-            )
-        return target.relative_to(package).as_posix()
-
-    if session.suffix.lower() == ".als":
-        from .als_read import _media_path
-        from .als_xml import load_als, save_als
-
-        root = load_als(source)
-        for clip in root.iter("AudioClip"):
-            ref = clip.find("SampleRef/FileRef")
-            if ref is None:
-                continue
-            rel = relative(_media_path(clip, source))
-            for tag, value in (("Path", ""), ("RelativePath", rel), ("RelativePathType", "3")):
-                node = ref.find(tag)
-                if node is None:
-                    import xml.etree.ElementTree as ET
-
-                    node = ET.SubElement(ref, tag)
-                node.set("Value", value)
-        save_als(root, session)
-    elif session.suffix.lower() == ".aaf":
-        import aaf2
-
-        with aaf2.open(str(session), "rw") as f:
-            for mob in f.content.sourcemobs():
-                for descriptor in _iter_descriptors(getattr(mob, "descriptor", None)):
-                    locators = descriptor.get("Locator")
-                    if locators:
-                        for locator in locators.value:
-                            url = locator.get("URLString")
-                            if url and url.value:
-                                url.value = "file:" + relative(url.value)
-    else:
-        raise TurnoverError("turnover supports only AAF and ALS")
-
-
-def _build_turnover_package(
-    session_file: str | Path,
-    media_dir: str | Path | None = None,
-    output_dir: str | Path | None = None,
-    session_name: str | None = None,
-    strict: bool = True,
-) -> TurnoverResult:
-    """Cria um pacote autocontido de turnover com sessao, midias, manifesto e relatorio."""
-    sess_path = Path(session_file).resolve()
-    if not sess_path.exists() or not sess_path.is_file():
-        raise FileNotFoundError(f"Session file not found: {sess_path}")
-
-    name = session_name or sess_path.stem
-
-    if output_dir is not None:
-        pkg_dir = Path(output_dir).resolve()
-    else:
-        pkg_dir = sess_path.parent / f"{name}_turnover"
-
-    pkg_dir.mkdir(parents=True, exist_ok=True)
-
-    # Localizar sidecar se existir
-    sidecar_cand = sess_path.with_name(sess_path.stem + ".aafton.json")
-    sidecar_path = sidecar_cand if sidecar_cand.exists() else None
-
-    # Resolver diretorio de midias
-    resolved_media_dir: Path | None = None
-    if media_dir is not None:
-        resolved_media_dir = Path(media_dir).resolve()
-    else:
-        candidates = [
-            sess_path.parent / f"{sess_path.stem} Project" / "Samples" / "Imported",
-            sess_path.parent / "media",
-            sess_path.parent / "Audio Files",
-            sess_path.parent,
-        ]
-        for c in candidates:
-            if c.is_dir():
-                resolved_media_dir = c
-                break
-        if resolved_media_dir is None:
-            resolved_media_dir = sess_path.parent
-
-    # Executar auditoria atraves do oraculo de midia
-    aaf_hashes = None
-    if sess_path.suffix.lower() == ".aaf":
-        import aaf2
-        from .aaf_read import _url_para_caminho
-
-        aaf_hashes = {}
-        with aaf2.open(str(sess_path), "r") as f:
-            for mob in f.content.sourcemobs():
-                for descriptor in _iter_descriptors(getattr(mob, "descriptor", None)):
-                    locators = descriptor.get("Locator")
-                    if locators:
-                        for locator in locators.value:
-                            url = locator.get("URLString")
-                            if url and url.value:
-                                candidate = Path(_url_para_caminho(url.value))
-                                if not candidate.is_absolute():
-                                    candidate = sess_path.parent / candidate
-                                if (
-                                    not candidate.is_file()
-                                    and (resolved_media_dir / candidate.name).is_file()
-                                ):
-                                    candidate = resolved_media_dir / candidate.name
-                                aaf_hashes[str(candidate)] = (
-                                    file_sha256(candidate) if candidate.is_file() else "missing"
-                                )
-    audit = verify_session_media(
-        resolved_media_dir, sidecar_path=sidecar_path, media_hashes=aaf_hashes
-    )
-
-    if strict and not audit.is_valid:
-        raise TurnoverValidationError(
-            f"Turnover failed the media verification in strict mode: "
-            f"{audit.missing_count} missing, {audit.corrupt_count} corrupt, "
-            f"{audit.mismatch_count} with a divergent hash."
-        )
-
-    # Copiar sessao para o pacote
-    dest_session = pkg_dir / sess_path.name
-    shutil.copy2(sess_path, dest_session)
-
-    # Copiar sidecar se existir
-    dest_sidecar: Path | None = None
-    if sidecar_path is not None:
-        dest_sidecar = pkg_dir / sidecar_path.name
-        shutil.copy2(sidecar_path, dest_sidecar)
-
-    # Copiar midias para a subpasta media/
-    dest_media_dir = pkg_dir / "media"
-    dest_media_dir.mkdir(exist_ok=True)
-    copied_media = []
-    copied_by_name = {}
-
-    for item in audit.results:
-        if item.path.exists() and item.path.is_file():
-            target_media = dest_media_dir / item.path.name
-            key = item.path.name.casefold()
-            if key in copied_by_name:
-                if file_sha256(copied_by_name[key]) != file_sha256(item.path):
-                    raise TurnoverValidationError(f"same-name media differ: {item.path.name}")
-                continue
-            shutil.copy2(item.path, target_media)
-            if item.sha256 and file_sha256(target_media) != item.sha256:
-                raise TurnoverValidationError(f"media changed during the copy: {item.path.name}")
-            copied_by_name[key] = target_media
-            copied_media.append(target_media)
-
-    _relink_session(dest_session, sess_path, pkg_dir, copied_by_name)
-    if dest_sidecar is not None:
-        data = json.loads(dest_sidecar.read_text(encoding="utf-8"))
-        # Modo permissivo não pode transformar um hash divergente em nova
-        # referência aprovada ao reescrever o sidecar para caminhos portáteis.
-        expected = {r.path.name.casefold(): r.expected_hash for r in audit.results}
-        data["media_hashes"] = {
-            p.name: expected.get(p.name.casefold()) or file_sha256(p) for p in copied_media
-        }
-        if data.get("video_path"):
-            video_name = Path(data["video_path"]).name.casefold()
-            if video_name in copied_by_name:
-                data["video_path"] = copied_by_name[video_name].relative_to(pkg_dir).as_posix()
-        dest_sidecar.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
-
-    # Construir mapa de arquivos do manifesto (calculando SHA-256 e tamanho exato em disco)
-    files_map: dict[str, dict] = {}
-    for p in sorted(pkg_dir.rglob("*")):
-        if p.is_file():
-            rel_name = p.relative_to(pkg_dir).as_posix()
-            if rel_name in ("manifest.json", "turnover_report.txt"):
-                continue
-            h = file_sha256(p)
-            files_map[rel_name] = {
-                "sha256": h,
-                "size_bytes": p.stat().st_size,
-            }
-
-    timestamp_iso = datetime.now(timezone.utc).isoformat()
-    manifest_data = {
-        "generator": "aafton-turnover",
-        "format_version": 1,
-        "created_at": timestamp_iso,
-        "session_name": name,
-        "session_file": sess_path.name,
-        "sidecar_file": sidecar_path.name if sidecar_path else None,
-        "total_files": len(files_map),
-        "files": files_map,
-        "audit_summary": audit.to_dict(),
-    }
-
-    manifest_path = pkg_dir / "manifest.json"
-    manifest_path.write_text(
-        json.dumps(manifest_data, indent=2, ensure_ascii=False), encoding="utf-8"
-    )
-
-    # Gerar relatorio tecnico turnover_report.txt
-    status_label = "STATUS: OK (VALID)" if audit.is_valid else "STATUS: DEGRADED (INVALID)"
-    report_lines = [
-        "=" * 70,
-        "AAFOUT / AAFTON POST-PRODUCTION TURNOVER PACKAGE REPORT",
-        "=" * 70,
-        f"Session Name:     {name}",
-        f"Created At:       {timestamp_iso}",
-        f"Session File:     {sess_path.name}",
-        f"Sidecar File:     {sidecar_path.name if sidecar_path else 'None'}",
-        f"Package Status:   {status_label}",
-        "",
-        "AUDIT SUMMARY:",
-        f"- Total Media Files:  {audit.total_files}",
-        f"- OK:                 {audit.ok_count}",
-        f"- Missing:            {audit.missing_count}",
-        f"- Corrupt:            {audit.corrupt_count}",
-        f"- Hash Mismatch:      {audit.mismatch_count}",
-        "",
-        "FILES IN PACKAGE:",
-    ]
-    for rel_path, meta in files_map.items():
-        report_lines.append(
-            f"  - {rel_path} ({meta['size_bytes']} bytes) [SHA-256: {meta['sha256']}]"
-        )
-
-    report_lines.extend(
-        [
-            "",
-            "MEDIA VERIFICATION DETAILS:",
-        ]
-    )
-    for r in audit.results:
-        err = f" - ERROR: {r.error_message}" if r.error_message else ""
-        report_lines.append(
-            f"  - {r.path.name}: {r.status.upper()} (SHA-256: {r.sha256 or 'N/A'}){err}"
-        )
-
-    report_lines.extend(
-        [
-            "=" * 70,
-            "",
-        ]
-    )
-
-    report_path = pkg_dir / "turnover_report.txt"
-    report_path.write_text("\n".join(report_lines), encoding="utf-8")
-
-    return TurnoverResult(
-        package_dir=pkg_dir,
-        manifest_path=manifest_path,
-        report_path=report_path,
-        session_path=dest_session,
-        sidecar_path=dest_sidecar,
-        media_count=len(copied_media),
-        manifest_data=manifest_data,
-        is_valid=audit.is_valid,
-    )
+        return res

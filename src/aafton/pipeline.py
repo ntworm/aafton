@@ -8,15 +8,22 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from .aaf_read import check_frame_alignment, check_pulldown
+from .als_ancora import StartSpec
 from .als_read import read_session
+from .als_render import filtrar_render_issue, recusar_se_parado
 from .als_write import WriteOptions, write_session
 from .bundled import default_template
+from .expandir import expand_production_channels
 from .formats.destino import write_destination
 from .formats.origem import conferir_canais, read_origin
 from .ir import MediaAsset, SessionIR
+from .ir_trim import trim_to_media_end
 from .ltc_track import add_ltc_track
 from .media_extract import AmbiguousMediaError, read_audio_metadata, resolve_asset
+from .organize_relatorio import relatar_compactacao as _relatar_compactacao
 from .report import Report
+from .som_direto import is_production_input, read_production
+from .som_direto_tracks import dividir_em_monos
 from .timecode import TimecodeRate, label_to_samples, samples_to_label
 
 PRE_ROLL_SEGUNDOS = 10
@@ -47,6 +54,38 @@ class ImportOptions:
     permissive: bool = False
     ltc: bool = False
     edl_rate: TimecodeRate | None = None
+    organize: str = "off"
+    certainty: str = "permissive"
+    organize_signals: tuple[str, ...] = ("file", "meta", "name", "family", "color", "compact")
+    organize_edits: dict | None = None
+
+
+# Recusas da expansao de canais pelo som direto.
+EXPANSION_LINK_REFUSED = (
+    "--media link is refused with --production-audio: "
+    "production audio is always split into mono files"
+)
+EXPANSION_INPUT_REFUSED = (
+    "--production-audio is refused for a production audio input: "
+    "it adds recorder inputs to an AAF, EDL or XML import"
+)
+
+
+# Recusa do set gravado dentro da pasta do gravador: os monos seriam lidos
+# como takes no proximo import e no verify. O app usa a mesma conferencia.
+SET_INSIDE_RECORDER = "The Live set cannot go inside the recorder folder."
+
+# --live-origin no som direto: cada bloco tem o proprio inicio, a opcao e ignorada.
+LIVE_ORIGIN_IGNORED = "each block of the set has its own start; --live-origin ignored"
+
+# Opcoes do import que nao valem no som direto: o set em blocos nao tem um
+# timecode continuo, entao cada uma e recusada com o nome dela.
+OPCOES_RECUSADAS_NO_SOM_DIRETO = (
+    ("ltc", "--ltc", "the set has no continuous timecode for an LTC track"),
+    ("video", "--video", "the set has no continuous timecode to anchor a video"),
+    ("video_start", "--video-start", "the set has no continuous timecode to anchor a video"),
+    ("session_text", "--session-text", "a session text belongs to an AAF session"),
+)
 
 
 def resolve_origin(valor: str | None, session: SessionIR, report: Report) -> int:
@@ -140,8 +179,80 @@ def resolve_media(opts: ImportOptions, session: SessionIR, report: Report) -> No
     conferir_canais(session, report)
 
 
-def import_session(opts: ImportOptions, report: Report) -> SessionIR:
-    """Runs the whole import: read, media, text, video and the Live set."""
+def _check_production_options(opts: ImportOptions, report: Report) -> None:
+    """Refuses the import options that do not apply to production audio."""
+    if opts.media == "link":
+        raise ValueError(
+            "--media link is refused: production audio is always split into mono files"
+        )
+    for campo, opcao, motivo in OPCOES_RECUSADAS_NO_SOM_DIRETO:
+        if getattr(opts, campo):
+            raise ValueError(f"{opcao} is refused for production audio: {motivo}")
+    if opts.groups != "none":
+        report.info("PRODUCTION_GROUPS_IGNORED", "--groups is ignored for production audio")
+    if opts.live_origin:
+        report.info("PRODUCTION_LIVE_ORIGIN_IGNORED", LIVE_ORIGIN_IGNORED)
+
+
+def check_production_output(input_path, output) -> None:
+    """Refuses a Live set whose media folder lies inside the recorder folder.
+
+    Para um WAV solto, a pasta do gravador e a pasta do proprio WAV (a diaria):
+    os monos do set ali seriam lidos como takes na proxima leitura da pasta.
+    """
+    fonte = Path(input_path)
+    raiz = fonte if fonte.is_dir() else fonte.parent
+    if media_dir_for(str(output)).resolve().is_relative_to(raiz.resolve()):
+        raise ValueError(SET_INSIDE_RECORDER)
+
+
+def import_production(
+    opts: ImportOptions, report: Report, *, circled_only: bool = False
+) -> SessionIR:
+    """Production audio: the folder or WAV becomes a set of mono tracks, days in blocks.
+
+    ``circled_only`` leaves out the takes that are not circled.
+    """
+    check_production_output(opts.input, opts.output)
+    _check_production_options(opts, report)
+    session = read_production(opts.input, report, circled_only=circled_only)
+    dividir_em_monos(session, media_dir_for(opts.output), report)
+    write_session(
+        session,
+        opts.template or default_template(),
+        opts.output,
+        WriteOptions(
+            sample_rate=session.sample_rate,
+            bpm=opts.bpm,
+            live_origin_samples=0,
+            permissive=opts.permissive,
+            fades=opts.fades,
+            stereo=opts.stereo,
+            groups="none",
+        ),
+        report,
+    )
+    return session
+
+
+def import_session(
+    opts: ImportOptions,
+    report: Report,
+    *,
+    circled_only: bool = False,
+    production_audio: str | None = None,
+) -> SessionIR:
+    """Runs the whole import: read, media, text, video and the Live set.
+
+    A folder or a .wav is production audio; ``circled_only`` applies only there.
+    ``production_audio`` is the recorder folder of an AAF, EDL or XML import:
+    the inputs the editor left out come in as sibling tracks.
+    """
+    if is_production_input(opts.input):
+        if production_audio:
+            raise ValueError(EXPANSION_INPUT_REFUSED)
+        return import_production(opts, report, circled_only=circled_only)
+    _check_expansion_options(opts, production_audio)
     stereo_dir = media_dir_for(opts.output)
     destino_midia = stereo_dir if opts.media == "extract" else None
     session = read_origin(
@@ -155,14 +266,78 @@ def import_session(opts: ImportOptions, report: Report) -> SessionIR:
     )
 
     resolve_media(opts, session, report)
+    # Corta no proprio SessionIR lido o clip que passa menos de um frame do
+    # fim da midia; a mudanca no lugar e aceita, o resto do import ve o corte.
+    trim_to_media_end(session, report)
+    _process_session(session, opts, report, stereo_dir, production_audio)
 
+    check_pulldown(session, report)
+
+    origem = resolve_origin(opts.live_origin, session, report)
+    if opts.ltc:
+        add_ltc_track(session, origem, stereo_dir, report)
+    _write_live_set(session, opts, origem, report)
+    return session
+
+
+def _excluded_for_organize(session: SessionIR, production_audio: str | None) -> set[int]:
+    """Descobre quais tracks do editor recebem irmas na expansao do som direto."""
+    if not production_audio:
+        return set()
+    from .expandir import planejar
+
+    plano = planejar(session, production_audio)
+    return {take.dona.source_index for take in plano.takes.values() if take.faltando}
+
+
+def _process_session(
+    session: SessionIR,
+    opts: ImportOptions,
+    report: Report,
+    stereo_dir: Path,
+    production_audio: str | None,
+) -> None:
+    """Session text, frame alignment, stereo pairing, channel expansion, organize and video."""
+    from .organize_apply import annotate_origin_keys, apply_proposal
+    from .organize_plan import build_proposal
     from .session_text import process_session_text
     from .stereo import process_stereo_pairing
     from .video import process_video
 
     process_session_text(session, Path(opts.input), opts.session_text, report)
     check_frame_alignment(session, report)
+    proposal = None
+    if opts.organize == "type":
+        annotate_origin_keys(session)
+        excluded = _excluded_for_organize(session, production_audio)
+        proposal = build_proposal(
+            session,
+            stereo=opts.stereo,
+            level=opts.certainty,
+            signals=opts.organize_signals,
+            edits=opts.organize_edits,
+            excluded_source_indices=excluded,
+        )
+        _relatar_compactacao(proposal, report)
     process_stereo_pairing(session, opts.stereo, report, stereo_dir)
+    if production_audio:
+        expand_production_channels(
+            session,
+            production_audio,
+            stereo_dir,
+            report,
+            groups=opts.groups,
+            editor=opts.input,
+        )
+    if proposal is not None:
+        use_colors = "color" in opts.organize_signals
+        for unidade in apply_proposal(session, proposal, colors=use_colors, report=report):
+            report.warning(
+                "ORGANIZE_UNIT_NOT_MOVED",
+                f"clip {unidade.name!r} stays on the editor's track: its stereo pair "
+                "did not become one clip",
+                {"track": unidade.source_label, "destination": unidade.destination_track_name},
+            )
     burn = bool(opts.video) and not opts.video_no_burn
     process_video(
         session,
@@ -173,11 +348,20 @@ def import_session(opts: ImportOptions, report: Report) -> SessionIR:
         burn_timecode=burn,
     )
 
-    check_pulldown(session, report)
 
-    origem = resolve_origin(opts.live_origin, session, report)
-    if opts.ltc:
-        add_ltc_track(session, origem, stereo_dir, report)
+def _check_expansion_options(opts: ImportOptions, production_audio: str | None) -> None:
+    """Refuses the options that do not go with --production-audio."""
+    if not production_audio:
+        return
+    if opts.media == "link":
+        raise ValueError(EXPANSION_LINK_REFUSED)
+    if not Path(production_audio).is_dir():
+        raise ValueError(f"the production audio folder {production_audio} does not exist")
+    check_production_output(production_audio, opts.output)
+
+
+def _write_live_set(session: SessionIR, opts: ImportOptions, origem: int, report: Report) -> None:
+    """Writes the Live set of an AAF, EDL or XML import."""
     write_session(
         session,
         opts.template or default_template(),
@@ -193,24 +377,28 @@ def import_session(opts: ImportOptions, report: Report) -> SessionIR:
         ),
         report,
     )
-    return session
 
 
-def _mensagens_das_tracks_removidas(reading: Report, nomes: set[str]) -> set[str]:
-    """Messages of the issues that belong to the given removed tracks.
+def _issue_da_track_removida(issue, escolhidos: set[str] | None, nomes_removidas: set[str]) -> bool:
+    """Diz se a issue pertence a uma faixa excluida pela selecao."""
+    contexto = issue.context
+    if "kind" in contexto:
+        return False
+    track_id = contexto.get("track_id")
+    if track_id is not None and escolhidos is not None:
+        return track_id not in escolhidos
+    return "track" in contexto and contexto["track"] in nomes_removidas
 
-    Only the issues that name the track are taken: an issue of a group, of a
-    return or of the main track carries the key ``tipo`` and is left alone.
-    """
-    mensagens = set()
-    for issue in reading.issues:
-        contexto = issue.context
-        if "track" not in contexto or "kind" in contexto:
-            continue
-        if contexto["track"] not in nomes:
-            continue
-        mensagens.add(issue.message)
-    return mensagens
+
+def _mensagens_das_tracks_removidas(
+    reading: Report, escolhidos: set[str], nomes: set[str]
+) -> list[str]:
+    """Mensagens das issues de suporte que pertencem as tracks removidas."""
+    return [
+        issue.message
+        for issue in reading.issues
+        if _issue_da_track_removida(issue, escolhidos, nomes)
+    ]
 
 
 def select_tracks(session: SessionIR, keep: Collection[int], reading: Report) -> set[str]:
@@ -232,21 +420,33 @@ def select_tracks(session: SessionIR, keep: Collection[int], reading: Report) ->
 
     nomes_mantidas = {track.name for track in mantidas}
     nomes_removidas = {track.name for track in removidas} - nomes_mantidas
-    mensagens = _mensagens_das_tracks_removidas(reading, nomes_removidas)
-    session.unsupported_export_features = [
-        feature for feature in session.unsupported_export_features if feature not in mensagens
-    ]
+    for mensagem in _mensagens_das_tracks_removidas(reading, escolhidos, nomes_removidas):
+        if mensagem in session.unsupported_export_features:
+            session.unsupported_export_features.remove(mensagem)
     return nomes_removidas
 
 
-def replay_issues(reading: Report, report: Report, skip_tracks: set[str]) -> None:
+def replay_issues(
+    reading: Report,
+    report: Report,
+    skip_tracks: set[str],
+    keep: Collection[int] | None = None,
+) -> None:
     """Replays the issues of the kept tracks into the report of the export.
 
     The issues of the removed tracks are left out. In a strict report the
     first error raises, exactly as a direct read would.
     """
+    escolhidos = None if keep is None else {f"t{i}" for i in keep}
     for issue in reading.issues:
-        if issue.context.get("track") in skip_tracks:
+        if _issue_da_track_removida(issue, escolhidos, skip_tracks):
+            continue
+        if issue.code == "ALS_RENDER_IN_LIVE" and escolhidos is not None:
+            filtrada = filtrar_render_issue(issue, escolhidos)
+            if filtrada is None:
+                continue
+            mensagem, contexto = filtrada
+            report.add(issue.severity, issue.code, mensagem, contexto)
             continue
         report.add(issue.severity, issue.code, issue.message, issue.context)
 
@@ -258,6 +458,8 @@ def export_session(
     *,
     media: str = "link",
     tracks: Collection[int] | None = None,
+    start: StartSpec | None = None,
+    leave_out_render: bool = False,
 ) -> SessionIR:
     """Reads the set and writes it to the destination, keeping the selection.
 
@@ -267,18 +469,28 @@ def export_session(
     stops at the first error before anything is written. An empty selection
     is an error: nothing is read and nothing is written. A selection that
     names no track of the set is an error too: no empty file is written.
+
+    ``start`` anchors a set without the aafton sidecar and ``leave_out_render``
+    leaves out its clips that need a render in Live (see ``read_session``).
+    The list of those clips stops the export even in a permissive report.
     """
+    opcoes: dict = {}
+    if start is not None:
+        opcoes["start"] = start
+    if leave_out_render:
+        opcoes["leave_out_render"] = True
     if tracks is None:
-        session = read_session(input_path, report)
+        session = read_session(input_path, report, **opcoes)
     else:
         escolhidos = list(tracks)
         if not escolhidos:
             raise NoTracksError("the export has no track selected")
         reading = Report(strict=False)
-        session = read_session(input_path, reading)
+        session = read_session(input_path, reading, **opcoes)
         removidas = select_tracks(session, escolhidos, reading)
         if not session.tracks:
             raise NoTracksError("the export has no track selected")
-        replay_issues(reading, report, removidas)
+        replay_issues(reading, report, removidas, escolhidos)
+    recusar_se_parado(report)
     write_destination(session, output_path, report, media=media)
     return session

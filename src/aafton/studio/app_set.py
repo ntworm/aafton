@@ -12,26 +12,30 @@ from dataclasses import replace
 from pathlib import Path
 
 from ..aaf_write import _preflight
+from ..als_ancora import start_do_pedido, start_padrao
 from ..als_preflight import ScannedTrack, scan_set
 from ..als_read import read_session
 from ..ir import SessionIR, TrackIR
 from ..pipeline import NoTracksError, export_session
 from ..report import ConversionIssue, Report, StrictModeError
-from ..sidecar import Anchor, SidecarMissingError, read_anchor
+from ..sidecar import Anchor, ProductionSetError, SidecarMissingError, read_anchor
 from ..verify import verify_conversion
-from . import app_view
+from . import app_collect, app_set_ancora, app_view
 from .app_convert import (
     LAST,
     caminhos,
     detalhe_da_diferenca,
     estado_do_destino,
+    problema_dos_arquivos,
     registra,
     registra_falha,
     resposta,
+    sumiu,
     veredito_nao_escrito,
     veredito_parado,
     verify_lines,
 )
+from .app_messages import falha_da_conversao, falha_do_motor
 from .app_read import FORMAT_NAMES, error
 
 # The label of each kind of track on the sheet.
@@ -42,12 +46,6 @@ TAG_NAMES = {kind: f"{kind.capitalize()}Track" for kind in KIND_LABELS}
 
 # The order the kinds appear in the Tracks fact.
 KIND_ORDER = ("audio", "midi", "group", "return")
-
-# The message of a set whose timecode reference is missing.
-NO_ANCHOR = (
-    "This set has no timecode reference. aafton can send back sets it created from an AAF: "
-    "the .aafton.json file must sit next to the .als."
-)
 
 # The line of the verdict when the position of the clips cannot be checked.
 POSICAO = "position check not available for this set"
@@ -70,23 +68,26 @@ def read_set(payload: dict) -> dict:
         return error("bad_request", "The set path is required.")
     caminho = Path(origem)
     if not caminho.exists():
-        return error("not_found", f"The file {caminho} was not found.")
+        return error("not_found", sumiu(caminho))
     if caminho.suffix.lower() != ".als":
         return error("unsupported", f"The format {caminho.suffix.lower()} is not a Live set.")
     try:
         scanned, creator = scan_set(caminho)
         report = Report(strict=False)
-        session = read_session(caminho, report)
-    except SidecarMissingError:
-        return error("no_anchor", NO_ANCHOR)
+        # A set without the aafton record is read from 01:00:00:00 at 24 fps,
+        # or from the TC locator of the aafton when it has one.
+        session = read_session(caminho, report, start=start_padrao())
+    except ProductionSetError as exc:
+        return error(ProductionSetError.code, str(exc))
     except Exception as exc:  # noqa: BLE001 - the message of the engine is the answer
-        return error("unreadable", str(exc))
+        return error("unreadable", falha_do_motor(exc, caminho, "read"))
     anchor = _anchor(caminho)
-    linhas, guia = _linhas(scanned, session, report, anchor)
+    linhas, guia, pode_deixar = _linhas(scanned, session, report, anchor)
     midia = _midia(session)
     return {
         "ok": True,
         "direction": "to_aaf",
+        **app_set_ancora.cabecalho(caminho, anchor, session, pode_deixar),
         "source": {"path": str(caminho.resolve()), "name": caminho.stem, "format": "als"},
         "facts": _facts(session, scanned, creator, anchor, midia),
         "timeline": app_view.timeline(session),
@@ -103,11 +104,7 @@ def read_set(payload: dict) -> dict:
 
 
 def _anchor(caminho: Path) -> Anchor | None:
-    """The anchor of the sidecar of the set; None when the set has no sidecar.
-
-    A set without a sidecar can still carry its anchor in a locator: the
-    engine recovers it while reading, and the app reads the set as it is.
-    """
+    """The anchor of the sidecar of the set; None when the set has no sidecar."""
     try:
         return read_anchor(caminho)
     except SidecarMissingError:
@@ -118,12 +115,11 @@ def _anchor(caminho: Path) -> Anchor | None:
 
 def _linhas(
     scanned: list[ScannedTrack], session: SessionIR, report: Report, anchor: Anchor | None
-) -> tuple[list[dict], list[str]]:
+) -> tuple[list[dict], list[str], bool]:
     """One row per scanned track, in the order of the scan, and the MIDI guide."""
     por_id = {track.id: track for track in session.tracks}
-    issues_por_track = app_view.issues_by_track(report.issues)
-    linhas = []
-    guia = []
+    issues_por_track = app_set_ancora.agrupar_issues(report.issues)
+    linhas, midi = [], []
     for posicao, item in enumerate(scanned):
         track = _track_lida(item, por_id)
         # Only an audio track can be missing from the read: it was generated.
@@ -132,8 +128,9 @@ def _linhas(
         estado = readiness(item, issues, lida=presente)
         linhas.append(_linha(posicao, item, track, session, estado, anchor))
         if item.kind == "midi" and item.clips:
-            guia.append(_nome_exibido(item))
-    return linhas, guia
+            midi.append(_nome_exibido(item))
+    guia, pode = app_set_ancora.aplicar_no_lote(scanned, linhas, por_id, report, anchor, midi)
+    return linhas, guia, pode
 
 
 def _nome_exibido(item: ScannedTrack) -> str:
@@ -152,10 +149,10 @@ def _issues_do_track(
     item: ScannedTrack,
     track: TrackIR | None,
     session: SessionIR,
-    issues_por_track: dict[str, list[ConversionIssue]],
+    issues_por_track: tuple[dict[str, list[ConversionIssue]], dict[str, list[ConversionIssue]]],
 ) -> list[ConversionIssue]:
     """The issues of one track: the ones of the read and the preflight of the writer."""
-    issues = list(issues_por_track.get(item.name, []))
+    issues = app_set_ancora.issues_da_track(item, issues_por_track)
     if track is not None:
         issues.extend(_preflight_da_track(session, track))
     return issues
@@ -306,6 +303,7 @@ def _facts(
     # recovered it from a locator and the session starts at the beat zero.
     beat_zero = anchor.live_origin_samples if anchor else session.start_timecode_samples
     return [
+        app_view.fact("Made in", app_set_ancora.made_in(anchor)),
         app_view.fact("Live", _sem_prefixo(creator)),
         app_view.fact("Sample rate", app_view.hz_label(session.sample_rate)),
         app_view.fact(
@@ -389,10 +387,10 @@ def convert_to_aaf(payload: dict) -> dict:
     destino = Path(saida).resolve()
     if destino.exists() and not payload.get("overwrite"):
         return error("exists", f"The file {destino} already exists.")
-    origem = Path(entrada)
-    if not origem.exists():
-        return error("not_found", f"The file {origem} was not found.")
-    return _exporta(origem, destino, selecao, payload)
+    problema = problema_dos_arquivos(destino, entrada)
+    if problema is not None:
+        return problema
+    return _exporta(Path(entrada), destino, selecao, payload)
 
 
 def _exporta(origem: Path, destino: Path, selecao: list[int], payload: dict) -> dict:
@@ -401,8 +399,10 @@ def _exporta(origem: Path, destino: Path, selecao: list[int], payload: dict) -> 
     permissivo = str(opcoes.get("mode") or "strict").lower() == "permissive"
     report = Report(strict=not permissivo)
     antes = estado_do_destino(destino)
+    media, leave = app_set_ancora.modo_da_midia(opcoes), bool(opcoes.get("leave_out_render"))
     try:
-        export_session(origem, destino, report, media=_modo_da_midia(opcoes), tracks=selecao)
+        opts = {"start": start_do_pedido(opcoes), "leave_out_render": leave}
+        export_session(origem, destino, report, media=media, tracks=selecao, **opts)
     except NoTracksError:
         LAST["to_aaf"] = {"output": None, "report": report}
         return error("no_tracks", "The selection names no audio track of the set.")
@@ -411,11 +411,17 @@ def _exporta(origem: Path, destino: Path, selecao: list[int], payload: dict) -> 
         return resposta(False, destino, veredito_parado(str(exc)), True, report)
     except Exception as exc:  # noqa: BLE001 - the message of the engine is the answer
         registra_falha("to_aaf", report)
-        return error("failed", str(exc))
+        return error("failed", falha_da_conversao(exc, destino, report, origem))
     escrito = registra("to_aaf", destino, report, antes)
     if not escrito:
         return resposta(False, destino, veredito_nao_escrito(report), False, report)
-    return resposta(escrito, destino, verdict_aaf(report, destino, origem), False, report)
+    collect_rep, collect_err = app_collect.collect_for_aaf_export(destino, opcoes, media, report)
+    verdict = app_collect.append_collect_verdict(
+        verdict_aaf(report, destino, origem, tracks=selecao, **opts), collect_rep
+    )
+    return app_collect.attach_collect_error(
+        resposta(escrito, destino, verdict, False, report), collect_err
+    )
 
 
 def _selecao(valor) -> list[int]:
@@ -430,15 +436,12 @@ def _selecao(valor) -> list[int]:
     return indices
 
 
-def _modo_da_midia(opcoes: dict) -> str:
-    """The mode of the media of the export: link or embed."""
-    modo = str(opcoes.get("media") or "link").strip().lower()
-    return modo if modo in ("link", "embed") else "link"
-
-
-def verdict_aaf(report: Report, output: Path, als: Path) -> dict:
+def verdict_aaf(
+    report, output: Path, als: Path, *, start=None, leave_out_render=False, tracks=None
+) -> dict:
     """The verdict of a Live to AAF conversion: what the report and the verify say."""
-    resultado = _verificacao(report, output, als)
+    opcoes = {"start": start, "leave_out_render": leave_out_render, "tracks": tracks}
+    resultado = _verificacao(report, output, als, **opcoes)
     erros = report.count("error")
     if erros:
         detalhe = [f"{app_view.plural(erros, 'error', 'errors')} reported"]
@@ -454,7 +457,7 @@ def verdict_aaf(report: Report, output: Path, als: Path) -> dict:
     return {"state": "ok", "word": "Positions verified", "detail": verify_lines(resultado)}
 
 
-def _verificacao(report: Report, output: Path, als: Path):
+def _verificacao(report, output: Path, als: Path, **opcoes):
     """The result of the verification of the written file; None when it cannot run."""
     if output.suffix.lower() != ".aaf":
         formato = FORMAT_NAMES.get(output.suffix.lower(), output.suffix.lstrip(".").upper())
@@ -465,12 +468,12 @@ def _verificacao(report: Report, output: Path, als: Path):
         )
         return None
     try:
-        return verify_conversion(output, als)
+        return verify_conversion(output, als, **opcoes)
     except Exception as exc:  # noqa: BLE001 - a verification that cannot run is said
         report.warning(
             "VERIFY_UNAVAILABLE",
             "The position check compares a source AAF with the Live set made from it "
-            f"and cannot describe this export ({exc}).",
+            f"and cannot describe this export ({falha_do_motor(exc, output, 'read')}).",
             {"output": str(output)},
         )
         return None

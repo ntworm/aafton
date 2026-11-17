@@ -77,7 +77,7 @@ def test_a_tabela_dos_filtros_tem_o_nome_e_a_extensao_de_cada_um():
 def test_o_texto_do_osascript_de_cada_tipo_escapa_o_titulo():
     prompt = f'with prompt "{ESCAPED}"'
     abertura = f"POSIX path of (choose file {prompt})"
-    salvar = f'POSIX path of (choose file name {prompt} default name "untitled.aaf")'
+    salvar = f"POSIX path of (choose file name {prompt})"
     pasta = f"POSIX path of (choose folder {prompt})"
 
     assert dialogs_macos.build_script("open_file", TITLE, ["aaf"]) == abertura
@@ -167,7 +167,7 @@ def test_o_windows_que_falha_da_o_erro_com_o_codigo(monkeypatch):
 def test_a_janela_que_falha_da_o_erro_com_o_codigo():
     """A janela que nao abre da a mensagem dela e o codigo do erro."""
 
-    def janela(kind, label, extensions, title):
+    def janela(kind, label, extensions, title, folder, name):
         """A janela do desktop que falha antes de abrir o dialogo."""
         raise dialogs.DialogError("the window did not open")
 
@@ -181,7 +181,7 @@ def test_a_janela_registrada_vence_o_sistema_e_recebe_o_filtro(monkeypatch):
     monkeypatch.setattr(sys, "platform", "linux")
     chamadas = []
 
-    def janela(kind, label, extensions, title):
+    def janela(kind, label, extensions, title, folder, name):
         chamadas.append((kind, label, extensions, title))
         return "/Users/editor/cena.aaf"
 
@@ -194,7 +194,7 @@ def test_a_janela_registrada_vence_o_sistema_e_recebe_o_filtro(monkeypatch):
 
 
 def test_a_janela_registrada_que_cancela_da_caminho_nulo():
-    dialogs.set_window_backend(lambda kind, label, extensions, title: None)
+    dialogs.set_window_backend(lambda kind, label, extensions, title, folder, name: None)
 
     assert dialogs.pick("open_file", "aaf", "Pick") == {"path": None}
 

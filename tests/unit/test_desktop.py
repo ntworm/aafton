@@ -163,7 +163,7 @@ def test_o_backend_mapeia_o_tipo_e_o_filtro_de_cada_dialogo(fake):
 
     backend("save_file", "AAF files", ["aaf"], "Pick")
     kind, _, _, name, filters = window.asked[-1]
-    assert (kind, name) == (SAVE, "untitled.aaf")
+    assert (kind, name) == (SAVE, "")
     assert filters == ("AAF files (*.aaf)", "All files (*.*)")
 
     backend("folder", "All files", [], "Pick")

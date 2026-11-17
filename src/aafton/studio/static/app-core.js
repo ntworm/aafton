@@ -12,6 +12,13 @@ App.$$ = (root, sel) => Array.from(root.querySelectorAll(sel));
 App.slot = (root, name) => root.querySelector(`[data-f="${name}"]`);
 App.tpl = (id) => document.getElementById(id).content.firstElementChild.cloneNode(true);
 
+// The template of a panel: its own, "<id>-<direction>", when the page has
+// one, the shared one otherwise.
+App.tplFor = (p, id) => {
+  const own = id + "-" + p.direction;
+  return document.getElementById(own) ? own : id;
+};
+
 App.fill = (root, name, text) => {
   const sel = `[data-f="${name}"]`;
   const node = root.nodeType === 1 && root.matches(sel) ? root : root.querySelector(sel);
@@ -71,8 +78,25 @@ App.api = async (method, path, body) => {
   }
 };
 
+// The path a save dialog starts from: the destination field, or the
+// destination the engine suggested when the field is empty. The report is
+// offered beside the destination, with its name and the .md suffix.
+App.saveInitial = (p, filter) => {
+  const typed = App.text(p.el, "output");
+  const suggest = (p.data && p.data.suggest) || {};
+  let dest = typed || suggest.output || "";
+  if (dest && !typed && p.direction === "to_aaf") {
+    dest = App.withFormat(dest, App.radio(p.el, "b-format") || "aaf");
+  }
+  if (!dest) return "";
+  if (filter === "report" && p.direction === "collect") return dest.replace(/[\\/]+$/, "") + ".md";
+  if (filter === "report") return dest.replace(/\.[^.\\/]*$/, "") + ".md";
+  return dest;
+};
+
 // The native dialog of the server; the path, or "" when it was cancelled.
-// A dialog that failed shows its message in the panel.
+// A dialog that failed shows its message in the panel. A save dialog opens
+// on the path the panel computes for this call.
 App.browse = async (p, kind, filter, title) => {
   const box = App.slot(p.el, "convert-error");
   if (box) box.hidden = true;
@@ -80,6 +104,7 @@ App.browse = async (p, kind, filter, title) => {
     kind: kind,
     filter: filter,
     title: title,
+    initial: kind === "save_file" ? App.saveInitial(p, filter) : "",
   });
   if (!res || !res.ok) {
     App.reportFailure(p, res);
@@ -147,7 +172,9 @@ App.hideExists = (p) => {
 App.clearRead = (p) => {
   p.data = null;
   p.result = null;
+  p.leaveOutRender = false;
   App.renderGuide(p, []);
+  App.syncStart(p, null);
   App.renderMedia(p, null);
 };
 
@@ -179,13 +206,20 @@ App.panelState = (direction) => ({
   outputTouched: false,
   open: null,
   lanes: [],
+  leaveOutRender: false,
   placeholders: {},
 });
 
 App.panels = {
   to_live: App.panelState("to_live"),
   to_aaf: App.panelState("to_aaf"),
+  production: App.panelState("production"),
+  collect: App.panelState("collect"),
+  reconform: App.panelState("reconform"),
 };
+
+// The hash of the URL that selects each direction.
+App.hashes = { to_live: "#to-live", to_aaf: "#to-aaf", production: "#production", collect: "#collect", reconform: "#reconform" };
 
 // The audio tracks of the Live to AAF sheet that are checked.
 App.selectedTracks = (p) => {
@@ -194,22 +228,16 @@ App.selectedTracks = (p) => {
     const box = App.slot(lane.row, "pick");
     if (!box || !box.checked) continue;
     const index = lane.track ? lane.track.audio_index : null;
-    if (index === null || index === undefined) continue;
-    chosen.push(index);
+    if (index !== null && index !== undefined) chosen.push(index);
   }
   return chosen;
 };
 
 // The rows of the Live to AAF sheet that the user can pick.
-App.pickableLanes = (p) => {
-  const lanes = [];
-  for (const lane of p.lanes || []) {
-    const track = lane.track || {};
-    if (track.pick === null || track.pick === undefined) continue;
-    lanes.push(lane);
-  }
-  return lanes;
-};
+App.pickableLanes = (p) => (p.lanes || []).filter((lane) => {
+  const track = lane.track || {};
+  return track.pick !== null && track.pick !== undefined;
+});
 
 // The pick-all box checks or clears every row that can be picked.
 App.pickAll = (p, checked) => {
@@ -224,9 +252,7 @@ App.setPhase = (p, phase) => {
   p.phase = phase;
   p.el.dataset.phase = phase;
   const busy = phase === "working";
-  App.$$(p.el, "fieldset.set").forEach((box) => {
-    box.disabled = busy;
-  });
+  App.$$(p.el, "fieldset.set").forEach((box) => { box.disabled = busy; });
   App.syncPrimary(p);
 };
 
@@ -236,12 +262,14 @@ App.syncPrimary = (p) => {
   if (!button) return;
   let enabled = p.phase === "ready" || p.phase === "done";
   if (enabled && p.direction === "to_aaf" && App.selectedTracks(p).length === 0) enabled = false;
+  if (enabled && p.direction === "reconform" && !App.reconformCanRun(p)) enabled = false;
   button.disabled = !enabled;
 };
 
 // The EDL block is shown only for a source that is an EDL, and the hint of
 // the block only while no frame rate is chosen.
 App.syncEdl = (p) => {
+  if (p.direction === "reconform") return App.syncReconformEdl(p);
   const input = App.slot(p.el, "input");
   const wrap = App.slot(p.el, "edl-rate-wrap");
   if (!input || !wrap) return;
@@ -269,6 +297,41 @@ App.syncFormat = (p) => {
   for (const radio of media) {
     radio.disabled = format !== "aaf";
   }
+  App.syncAafCollect(p);
+};
+
+// Start timecode and frame rate exist only for a Live set without an aafton record.
+App.syncStart = (p, data) => {
+  p.leaveOutRender = false;
+  const wrap = App.slot(p.el, "start-wrap");
+  if (!wrap) return;
+  const start = data && data.start;
+  wrap.hidden = !start;
+  if (!start) return;
+  const tc = App.slot(p.el, "start_tc");
+  if (tc) tc.value = start.start_tc || "01:00:00:00";
+  const fps = String(start.frame_rate || "24");
+  for (const radio of App.radios(p.el, "b-fps")) {
+    radio.checked = radio.value === fps;
+  }
+};
+
+// Options of the Live to AAF conversion, including start fields when shown.
+App.aafOptions = (p) => {
+  const format = App.radio(p.el, "b-format");
+  const media = App.radio(p.el, "b-media");
+  const opts = {
+    media: media,
+    format: format,
+    mode: App.radio(p.el, "b-mode"),
+    collect_media: format === "aaf" && media === "link" && App.checked(p.el, "collect_media"),
+  };
+  if (p.data && p.data.start) {
+    opts.start_tc = App.text(p.el, "start_tc");
+    opts.frame_rate = App.radio(p.el, "b-fps");
+  }
+  if (p.leaveOutRender) opts.leave_out_render = true;
+  return opts;
 };
 
 // --- the tabs ------------------------------------------------------------
@@ -291,7 +354,7 @@ App.selectTab = (direction, focus) => {
     if (panel) panel.hidden = !on;
     if (on && focus) tab.focus();
   }
-  history.replaceState(null, "", direction === "to_aaf" ? "#to-aaf" : "#to-live");
+  history.replaceState(null, "", App.hashes[direction] || "#to-live");
   App.paintLanes(p);
 };
 

@@ -1,5 +1,5 @@
 /* aafton — app interface.
-   One window, two directions, laid out as an operator sheet: ruled bands,
+   One window, three tabs, laid out as an operator sheet: ruled bands,
    labelled cells, measured values in a fixed-width face. No radius, no
    drop shadow, no gradient. One accent, amber, kept for the action and for
    where you are; a choice already made is drawn in bright ink, not in
@@ -48,6 +48,16 @@
   --flux-wash:#1f1e12;
   --red:#ff4a3d;
   --red-wash:#241412;
+  /* organize kinds */
+  --ink-prod:#d6b52a;
+  --ink-vo:#4f8fe0;
+  --ink-cam:#8e8e8e;
+  --ink-mx:#a070d8;
+  --ink-sfx:#e0473c;
+  --ink-amb:#3ecc79;
+  --ink-ref:#6c6c58;
+  --ink-fam:#b08a5a;
+  --ink-unsorted:#5c5c5c;
   /* type */
   --ui:"IBM Plex Sans","Segoe UI",system-ui,sans-serif;
   --data:"IBM Plex Mono",ui-monospace,"Cascadia Mono",Consolas,monospace;
@@ -136,6 +146,8 @@ h2{font-size:12px;line-height:20px;font-weight:500;letter-spacing:.1em;text-tran
   font-family:var(--ui);font-size:11px;line-height:16px;font-weight:400;letter-spacing:.08em;text-transform:uppercase;
   color:var(--label)}
 .field .path{width:100%}
+.field .start-tc{max-width:14ch}
+.start-wrap{margin-top:12px}
 .field-row{display:flex;gap:8px}
 
 .set{border:0;padding:0;margin:0;min-width:0}
@@ -215,8 +227,36 @@ h2{font-size:12px;line-height:20px;font-weight:500;letter-spacing:.1em;text-tran
 .reasons li{list-style:none;padding-left:16px;text-indent:-16px}
 .reasons li::before{content:"\2013";display:inline-block;width:16px;text-indent:0;color:var(--ink-faint)}
 
+/* ---------- production audio sheet ----------
+   One segment of the ruler per shooting day, each an equal share of the
+   lane; the script draws each day in its share. The circled takes are
+   drawn in the state green, and so is their mark in the clip table. */
+.ruler-days{display:flex;font-family:var(--data);letter-spacing:0;text-transform:none;color:var(--ink-2)}
+.ruler-days span{flex:1 1 0;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  border-left:1px solid var(--rule-hi);padding-left:4px}
+.ruler-days span:first-child{border-left:0;padding-left:0}
+.lane{--lane-circled:var(--ok);--lane-block:var(--rule-hi);--lane-stay:var(--ink-off)}
+.sheet .c-takes{width:60px;text-align:right;font-family:var(--data);font-size:12px}
+.sheet th.c-takes{font-family:var(--ui);font-size:11px;color:var(--label)}
+.circ{color:var(--ok)}
+.circ:not(:empty)::before{content:"\25CF\00a0"}
+.mic{color:var(--ink-2)}
+.clips-days .clips th:nth-child(2){width:96px}
+.clips-days .clips th:nth-child(3),.clips-days .clips th:nth-child(4){width:116px}
+.clips-days .clips th:nth-child(5){width:96px}
+
 .sheet-foot{display:flex;justify-content:space-between;gap:16px;margin-top:8px;color:var(--ink-2)}
 .sheet-foot b{font-weight:500;color:var(--ink-hi);font-family:var(--data)}
+
+/* ---------- sibling tracks of the AAF to Live sheet ----------
+   The channels the editor left out, from the recorder files: indented
+   under their owner track with the return mark, the bars in plain ink.
+   The open sibling row keeps the amber of where you are. */
+.row-exp td.c-name{padding-left:28px}
+.row-exp .name::before{content:"\21B3";color:var(--ink-faint)}
+.row-exp .name[aria-expanded="true"]::before{content:"\21B3";color:var(--amber)}
+.row-exp .lane:not([data-tone]){color:var(--ink)}
+.opt-mark{text-transform:none;letter-spacing:0;color:var(--ink-faint)}
 
 /* ---------- notes ---------- */
 .notes-h{margin:20px 0 4px}
@@ -317,3 +357,51 @@ h2{font-size:12px;line-height:20px;font-weight:500;letter-spacing:.1em;text-tran
   .col-side{position:static;max-height:none}
   .col-side .step-c{max-width:560px}
 }
+
+/* ---------- organize view ---------- */
+.view-switch{display:flex;align-items:center;gap:12px;margin:0 0 8px}
+.view-switch .segs{width:260px}
+.sheet .c-sw{width:14px;padding:0 0 0 8px}
+.sw{display:block;width:10px;height:10px;background:var(--rule-hi)}
+.sheet[data-colored="1"] [data-kind="PRODUCTION"]{--kind-c:var(--ink-prod)}
+.sheet[data-colored="1"] [data-kind="VO"]{--kind-c:var(--ink-vo)}
+.sheet[data-colored="1"] [data-kind="CAMERA"]{--kind-c:var(--ink-cam)}
+.sheet[data-colored="1"] [data-kind="MUSIC"]{--kind-c:var(--ink-mx)}
+.sheet[data-colored="1"] [data-kind="SFX"]{--kind-c:var(--ink-sfx)}
+.sheet[data-colored="1"] [data-kind="AMBIENCE"]{--kind-c:var(--ink-amb)}
+.sheet[data-colored="1"] [data-kind="PICTURE_REF"]{--kind-c:var(--ink-ref)}
+.sheet[data-colored="1"] [data-kind="family"]{--kind-c:var(--ink-fam)}
+.sheet [data-kind="unsorted"]{--kind-c:var(--ink-unsorted)}
+.sw[data-kind]{background:var(--kind-c,var(--rule-hi))}
+.lane[data-kind]{color:var(--kind-c,var(--ink-2))}
+.row-g td{background:var(--surface);height:30px}
+.row-g .gname{font-weight:500;color:var(--ink-hi);letter-spacing:.04em}
+.row-g .gmeta{color:var(--ink-2);font-family:var(--data);font-size:12px}
+.row-t td.c-name{padding-left:24px}
+.tname-wrap{display:flex;gap:6px;align-items:baseline}
+.tname-wrap .name{width:auto;flex:0 0 auto}
+.row-c td{height:24px;font-size:12px;background:var(--sunk)}
+.row-c td.c-name{padding-left:44px;font-family:var(--data);color:var(--ink)}
+.row-c .why{color:var(--ink-2);font-family:var(--ui)}
+.row-c[data-on="0"] td{color:var(--ink-faint)}
+.row-c[data-on="0"] .why{color:var(--ink-off)}
+.dots{font-family:var(--data);letter-spacing:1px;color:var(--ink-faint)}
+.dots b{color:var(--ink-hi);font-weight:400}
+.row-t .from{color:var(--ink-2);font-size:12px}
+.row-asis .gname{color:var(--ink-2)}
+.edited{color:var(--amber);font-size:11px;margin-left:6px}
+.org-sum{margin-top:12px;border:1px solid var(--rule);background:var(--sunk);padding:8px 10px;font-size:12px;color:var(--ink-2);line-height:18px}
+.org-sum b{color:var(--ink-hi);font-family:var(--data);font-weight:500}
+.sigs{display:grid;gap:0}
+.sigs .check{margin-top:8px}
+.c-name input.tname{flex:1 1 auto;min-width:0;text-align:left;background:none;border:0;border-bottom:1px solid transparent;width:100%;color:var(--ink-hi);padding:0}
+.c-name input.tname:hover{border-bottom-color:var(--rule-hi)}
+.c-name input.tname:focus{border-bottom-color:var(--amber)}
+.reset{margin-left:auto}
+.row-div td{padding:10px 8px 8px;border-top:1px solid var(--rule-hi);color:var(--ink-2);font-size:12px;line-height:18px;background:var(--bg)}
+.row-div b{color:var(--ink-hi);font-weight:500;letter-spacing:.04em;text-transform:uppercase;font-size:11px}
+.gin{font-weight:500;letter-spacing:.02em}
+.sheet .c-from{color:var(--ink-2);white-space:nowrap}
+#panel-collect .sheet .c-clips{width:96px;white-space:nowrap;text-overflow:clip}
+#panel-reconform .sheet .c-clips{width:104px;white-space:nowrap;text-overflow:clip}
+.check input:disabled{border-color:var(--rule);background:transparent;cursor:default}

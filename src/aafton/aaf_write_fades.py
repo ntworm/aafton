@@ -36,6 +36,12 @@ def fades_para_silencio(clip, consumed_in, consumed_out, gain_points) -> tuple[i
     return entrada, saida
 
 
+def _fades_cabem(clip) -> bool:
+    """Diz se os fades de entrada e de saida cabem juntos no clip."""
+    duracao = clip.timeline_end_samples - clip.timeline_start_samples
+    return _duracao(clip.fade_in) + _duracao(clip.fade_out) <= duracao
+
+
 def fades_em_envelope(clip, consumed_in, consumed_out, gain_points) -> tuple[bool, bool]:
     """Fades independentes que ficam como envelope de ganho, entrada e saida.
 
@@ -84,19 +90,30 @@ def _fades_como_transition(track, consumed_in, consumed_out, pulados) -> set:
 def reportar_fades(track, consumed_in, consumed_out, pulados, report: Report) -> None:
     """Reporta os fades que ficam como envelope e os que viram Transition.
 
-    O fade que nao cabe no clip, ou que tem automacao dentro dele, continua
-    como envelope de ganho: e um erro, porque o AAF nao o representa.
+    O fade que nao cabe no clip continua como envelope de ganho e e um erro,
+    porque o AAF nao o representa. O fade que cabe no clip mas tem automacao
+    dentro dele tambem vira envelope; o som fica igual, so o fade editavel se
+    perde, entao e um aviso (decisao de Gabriel de 16/11/2026).
     """
     for clip in track.clips:
         if id(clip) in pulados:
             continue
-        if any(fades_em_envelope(clip, consumed_in, consumed_out, track.gain_points)):
-            report.error(
-                "WRITE_FADE_UNSUPPORTED",
-                f"independent fade of {clip.name!r} cannot be written as a fade in the AAF; "
-                "use rendered audio",
-                {"clip": clip.name},
+        if not any(fades_em_envelope(clip, consumed_in, consumed_out, track.gain_points)):
+            continue
+        if _fades_cabem(clip):
+            report.warning(
+                "WRITE_FADE_AS_ENVELOPE",
+                f"fade of {clip.name!r} has gain automation inside it and was written as "
+                "part of the gain envelope: the sound is kept, the editable fade is not",
+                {"clip": clip.name, "track": track.name},
             )
+            continue
+        report.error(
+            "WRITE_FADE_UNSUPPORTED",
+            f"independent fade of {clip.name!r} cannot be written as a fade in the AAF; "
+            "use rendered audio",
+            {"clip": clip.name},
+        )
     fades = _fades_como_transition(track, consumed_in, consumed_out, pulados)
     if fades:
         report.info(

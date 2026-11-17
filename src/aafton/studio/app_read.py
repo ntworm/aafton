@@ -22,7 +22,8 @@ from ..report import Report
 from ..session_text import find_session_text
 from ..timecode import TimecodeRate
 from ..video import find_video_file
-from . import app_view
+from . import app_expandir, app_view
+from .app_messages import falha_do_motor, mensagem_de_arquivo
 
 # The name each format shows in the sheet.
 FORMAT_NAMES = {
@@ -46,6 +47,11 @@ def read(payload: dict) -> dict:
         from . import app_set
 
         return app_set.read_set(payload)
+    if direction == "production":
+        # O import fica dentro da funcao: app_pa importa este modulo.
+        from . import app_pa
+
+        return app_pa.read(payload)
     return error("bad_request", "The direction must be to_live or to_aaf.")
 
 
@@ -71,7 +77,7 @@ def read_source(payload: dict) -> dict:
         return error("bad_request", "The source path is required.")
     caminho = Path(origem)
     if not caminho.exists():
-        return error("not_found", f"The file {caminho} was not found.")
+        return error("not_found", mensagem_de_arquivo(FileNotFoundError(), caminho, "read"))
     sufixo = caminho.suffix.lower()
     if sufixo != ".aaf" and sufixo not in ADAPTADORES:
         return error("unsupported", f"The format {sufixo} is not read by this direction.")
@@ -94,11 +100,11 @@ def read_source(payload: dict) -> dict:
             mxf_dir=None,
         )
     except Exception as exc:  # noqa: BLE001 - the message of the engine is the answer
-        return error("unreadable", str(exc))
+        return error("unreadable", falha_do_motor(exc, caminho, "read"))
 
     midia = _midia(sessao, raizes, report, essencias)
     _texto_da_sessao(sessao, caminho, report)
-    return {
+    resposta = {
         "ok": True,
         "direction": "to_live",
         "source": _origem(caminho, sufixo),
@@ -110,6 +116,26 @@ def read_source(payload: dict) -> dict:
         "guide": [],
         "suggest": _sugestao(caminho),
     }
+    return _com_o_gravador(payload, sessao, report, resposta)
+
+
+def _com_o_gravador(payload: dict, sessao: SessionIR, report: Report, resposta: dict) -> dict:
+    """The read with the production audio folder: the fact, the sibling rows and the notes.
+
+    Without a folder the answer is the one of the session alone. A folder the
+    engine refuses is the error of the read, with the message of the engine.
+    """
+    pasta = app_expandir.folder(payload)
+    if not pasta:
+        return resposta
+    try:
+        plano = app_expandir.preview(sessao, pasta, report)
+    except (ValueError, OSError) as exc:  # the message of the engine is the answer
+        return error("unreadable", falha_do_motor(exc, pasta, "read"))
+    resposta["facts"].append(app_expandir.fact(plano))
+    resposta["tracks"] = app_expandir.mark_rows(_tracks(sessao, report), sessao)
+    resposta["notes"] = app_view.notes(report.issues)
+    return resposta
 
 
 def _origem(caminho: Path, sufixo: str) -> dict:
@@ -297,7 +323,8 @@ def _resolver(asset: MediaAsset, raizes: list[Path], sonda: Report) -> None:
     except ValueError as exc:
         sonda.error("MEDIA_FORMAT_UNSUPPORTED", str(exc), {"filename": asset.filename})
     except Exception as exc:  # noqa: BLE001 - the message of the engine is the answer
-        sonda.error("MEDIA_RESOLVE_ERROR", str(exc), {"filename": asset.filename})
+        mensagem = falha_do_motor(exc, None, "read")
+        sonda.error("MEDIA_RESOLVE_ERROR", mensagem, {"filename": asset.filename})
 
 
 def _copiar_issues(sonda: Report, report: Report) -> None:

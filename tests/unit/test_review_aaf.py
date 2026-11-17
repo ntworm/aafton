@@ -99,7 +99,10 @@ def test_export_preserves_static_gain_or_mute(tmp_path, muted):
     session.tracks[0].muted = muted
     path = tmp_path / "output.aaf"
     write_aaf(session, path, Report())
-    assert next(read_aaf(path, Report()).all_clips()).gain_linear == (0 if muted else 0.125)
+    # Track muda vai como clip mudo com o ganho normal (decisao de Gabriel, 15/11/2026).
+    relido = next(read_aaf(path, Report()).all_clips())
+    assert relido.gain_linear == 0.125
+    assert relido.muted is muted
 
 
 @pytest.mark.parametrize("gain", [0.0, 0.5, 0.0000001])

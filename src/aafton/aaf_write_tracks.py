@@ -22,16 +22,14 @@ from .aaf_write_gain import (
     _aplicar_fade_out,
     _dedup_keyframes,
     _ganho_base,
+    clip_mudo,
     _keyframes_automacao,
 )
 from .aaf_write_media import (
     MobResolver as _MobResolver,
     source_start as _source_start,
 )
-from .aaf_write_preflight import (
-    _is_supported_transition,
-    _transition_conflicts_with_automation,
-)
+from .aaf_write_preflight import _is_supported_transition
 
 
 _LAYOUT_SUFFIX_RE = re.compile(r"\s*\[(?P<suffix>[^\]]+)\]$")
@@ -217,11 +215,7 @@ def _clips_pulados(clips_do_canal: list, track, session) -> set[int]:
             cursor = start_local
         if start_local < cursor:
             overlap = cursor - start_local
-            if not _is_supported_transition(
-                previous_clip, clip, overlap
-            ) or _transition_conflicts_with_automation(
-                previous_clip, clip, overlap, track.gain_points
-            ):
+            if not _is_supported_transition(previous_clip, clip, overlap):
                 pulados.add(id(clip))
                 continue
             cursor -= overlap
@@ -269,6 +263,17 @@ def _reporta_clip_pulado(ctx: TrackContext, track, clip) -> None:
     )
 
 
+def _anexador(ctx: TrackContext, sequence, duration: int, mudo: bool):
+    """Poe o componente do clip na Sequence; o clip mudo vai num Selector."""
+
+    def anexar(componente) -> None:
+        if mudo:
+            componente = ctx.builder.wrap_mute(componente, duration)
+        sequence.components.append(componente)
+
+    return anexar
+
+
 def _escrever_clip(ctx: TrackContext, track, canal, clip, sequence) -> None:
     """Escreve o clip no sequence: ganho fixo ou envelope de ganho."""
     start_local = clip.timeline_start_samples - ctx.session.start_timecode_samples
@@ -278,9 +283,9 @@ def _escrever_clip(ctx: TrackContext, track, canal, clip, sequence) -> None:
         clip, ctx.consumed_in, ctx.consumed_out, track.gain_points
     )
     base_gain = _ganho_base(track, clip)
-
+    anexar = _anexador(ctx, sequence, duration, clip_mudo(track, clip))
     if not has_gain_automation and not has_indep_fade_in and not has_indep_fade_out:
-        sequence.components.append(
+        anexar(
             ctx.builder.wrap_audio_gain(
                 _component_do_clip(ctx, track, canal, clip, 0, duration),
                 duration,
@@ -299,7 +304,7 @@ def _escrever_clip(ctx: TrackContext, track, canal, clip, sequence) -> None:
         has_indep_fade_in,
         has_indep_fade_out,
     )
-    sequence.components.append(
+    anexar(
         ctx.builder.wrap_varying_gain(
             _component_do_clip(ctx, track, canal, clip, 0, duration),
             duration,
@@ -446,3 +451,28 @@ def _pan_estatico(ctx: TrackContext, track) -> float:
         )
         live_pan = 0.0
     return (live_pan + 1.0) / 2.0
+
+
+@dataclass(frozen=True)
+class ExpectedSlot:
+    """Slot esperado no AAF para uma track e canal do SessionIR."""
+
+    name: str
+    track: object
+    channel: int
+    clips: tuple
+
+
+def expected_slots(session: SessionIR) -> list[ExpectedSlot]:
+    """Lista ordenada de slots que o escritor cria para a sessao."""
+    slots: list[ExpectedSlot] = []
+    for track in session.tracks:
+        if getattr(track, "is_video", False):
+            continue
+        base_name = _strip_channel_suffix(track.name)
+        for canal in _canais_da_track(track):
+            clips_do_canal = _clips_do_canal(track, canal)
+            pulados = _clips_pulados(clips_do_canal, track, session)
+            ativos = tuple(clip for clip in clips_do_canal if id(clip) not in pulados)
+            slots.append(ExpectedSlot(base_name, track, canal, ativos))
+    return slots

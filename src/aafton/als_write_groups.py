@@ -7,20 +7,40 @@ inferencia; a emissao dos grupos fica em ``als_write_tracks``.
 
 import re
 from collections import defaultdict
+from dataclasses import replace
 
 from .als_write_base import WriteOptions
 from .ir import SessionIR
 
 
 def infer_track_groups(session: SessionIR, options: WriteOptions) -> dict[int, str]:
-    """Mapeia ``id(track)`` para o nome do grupo inferido pelo nome da track."""
+    """Mapeia ``id(track)`` para o nome do grupo inferido pelo nome da track.
+
+    A track da expansao de canais (a do editor e as irmas) e a track ja
+    organizada por tipo ou familia ficam no grupo que vem do IR, fora das
+    regras de prefixo e de sufixo.
+    """
+    expansao = expansion_groups(session)
+    organizados = organize_groups(session)
+    fixos = {**expansao, **organizados}
     track_to_group: dict[int, str] = {}
-    if options.groups != "prefix":
-        return track_to_group
-    _apply_prefix_rule(session, track_to_group)
-    _apply_suffix_rule(session, track_to_group)
-    _rename_suffix_only_groups(session, track_to_group)
+    if options.groups == "prefix":
+        resto = replace(session, tracks=[t for t in session.tracks if id(t) not in fixos])
+        _apply_prefix_rule(resto, track_to_group)
+        _apply_suffix_rule(resto, track_to_group)
+        _rename_suffix_only_groups(resto, track_to_group)
+    track_to_group.update(fixos)
     return track_to_group
+
+
+def expansion_groups(session: SessionIR) -> dict[int, str]:
+    """Grupo da expansao de canais de cada track que tem um."""
+    return {id(t): t.expansion_group for t in session.tracks if t.expansion_group}
+
+
+def organize_groups(session: SessionIR) -> dict[int, str]:
+    """Grupo da organizacao por tipo ou familia de cada track que tem um."""
+    return {id(t): t.organize_group for t in session.tracks if t.organize_group}
 
 
 def _apply_prefix_rule(session: SessionIR, track_to_group: dict[int, str]) -> None:

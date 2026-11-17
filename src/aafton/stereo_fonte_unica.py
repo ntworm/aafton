@@ -26,18 +26,24 @@ def colapsar_fonte_unica(session: SessionIR, report: Report) -> int:
     return total
 
 
+def _juntar_chaves(clip_esq: ClipIR, clip_dir: ClipIR) -> None:
+    """O clip que fica leva as chaves de origem do canal direito (organizacao)."""
+    if "origin_keys" in clip_esq.raw and "origin_keys" in clip_dir.raw:
+        novas = [k for k in clip_dir.raw["origin_keys"] if k not in clip_esq.raw["origin_keys"]]
+        clip_esq.raw["origin_keys"] = [*clip_esq.raw["origin_keys"], *novas]
+
+
 def _colapsar_track(session: SessionIR, track: TrackIR, report: Report) -> int:
     """Colapsa os pares de uma track e avisa quantos foram."""
     if track.channel_count != 2 or not track.clips:
         return 0
 
-    colapsados = [
-        clip_dir
-        for clip_esq, clip_dir in _pares_do_evento(track)
-        if _mesma_fonte(session, clip_esq, clip_dir)
-    ]
+    pares = [(e, d) for e, d in _pares_do_evento(track) if _mesma_fonte(session, e, d)]
+    colapsados = [clip_dir for _, clip_dir in pares]
     if not colapsados:
         return 0
+    for clip_esq, clip_dir in pares:
+        _juntar_chaves(clip_esq, clip_dir)
 
     removidos = {id(clip) for clip in colapsados}
     track.clips = [clip for clip in track.clips if id(clip) not in removidos]

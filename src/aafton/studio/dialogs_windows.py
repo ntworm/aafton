@@ -23,6 +23,10 @@ OPEN_FILTERS = {
 }
 
 
+# O fim de cada linha do script.
+NOVA_LINHA = chr(10)
+
+
 def _escape_title(title: str) -> str:
     """Escapes the single quotes for a safe use inside the PowerShell script."""
     return str(title).replace("'", "''")
@@ -61,7 +65,17 @@ if ($f.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {{
 """
 
 
-def _save_script(title: str, ext_filter: str, def_ext: str) -> str:
+def _inicio_script(folder: str, name: str) -> str:
+    """As linhas da pasta e do nome do dialogo de salvar; vazio sem os dois."""
+    linhas = ""
+    if folder:
+        linhas += f"$f.InitialDirectory = '{_escape_title(folder)}'" + NOVA_LINHA
+    if name:
+        linhas += f"$f.FileName = '{_escape_title(name)}'" + NOVA_LINHA
+    return linhas
+
+
+def _save_script(title: str, ext_filter: str, def_ext: str, inicio: str = "") -> str:
     """Builds the script of the save dialog of a file."""
     return f"""
 Add-Type -AssemblyName System.Windows.Forms
@@ -69,7 +83,7 @@ $f = New-Object System.Windows.Forms.SaveFileDialog
 $f.Title = '{title}'
 $f.Filter = '{ext_filter}'
 $f.DefaultExt = '{def_ext}'
-if ($f.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {{
+{inicio}if ($f.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {{
     [Console]::WriteLine($f.FileName)
 }}
 """
@@ -88,14 +102,19 @@ if ($f.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {{
 """
 
 
-def build_dialog_script(kind: str, filter_type: str, title: str) -> str:
-    """Builds the PowerShell script of the native dialog by kind, filter and title."""
+def build_dialog_script(
+    kind: str, filter_type: str, title: str, folder: str = "", name: str = ""
+) -> str:
+    """Builds the PowerShell script of the native dialog by kind, filter and title.
+
+    The save dialog opens in ``folder`` and offers ``name`` when they are given.
+    """
     safe_title = _escape_title(title)
     if kind == "folder":
         return _folder_script(safe_title)
     if kind == "save_file":
         ext_filter, def_ext = _save_filter(filter_type)
-        return _save_script(safe_title, ext_filter, def_ext)
+        return _save_script(safe_title, ext_filter, def_ext, _inicio_script(folder, name))
     return _open_script(safe_title, _open_filter(filter_type))
 
 

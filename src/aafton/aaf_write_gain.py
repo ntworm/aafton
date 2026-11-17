@@ -45,7 +45,16 @@ def _fades_independentes(clip, consumed_in, consumed_out) -> tuple[bool, bool]:
 
 def _ganho_base(track, clip) -> float:
     """Ganho constante do clip, antes de qualquer envelope de automacao ou fade."""
-    return 0.0 if track.muted or clip.muted else track.gain_linear * clip.gain_linear
+    return track.gain_linear * clip.gain_linear
+
+
+def clip_mudo(track, clip) -> bool:
+    """Track muda ou clip desativado: o clip vai ao AAF mudo, com o ganho normal.
+
+    Decisao de Gabriel (15/11/2026): o editor desmuta o clip no Pro Tools em vez
+    de subir um ganho que veio -inf.
+    """
+    return bool(track.muted or clip.muted)
 
 
 def _keyframes_automacao(

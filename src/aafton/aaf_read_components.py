@@ -20,6 +20,7 @@ from fractions import Fraction
 from pathlib import Path
 
 
+from .media_names import sem_extensao_de_audio
 from .report import Report
 
 from .timecode import exact_edit_rate
@@ -334,7 +335,7 @@ def _nome_final(component, master_name, estado: _CaminhoMob, final_mob_id) -> st
     if estado.caminho_arquivo:
         return estado.caminho_arquivo
     if final_mob_id:
-        return f"{master_name or 'audio'}{estado.sufixo_slot}.wav"
+        return f"{sem_extensao_de_audio(master_name) or 'audio'}{estado.sufixo_slot}.wav"
     nome_fallback = master_name or getattr(getattr(component, "mob", None), "name", None)
     if nome_fallback and not str(nome_fallback).lower().endswith(".wav"):
         nome_fallback = f"{nome_fallback}{estado.sufixo_slot}.wav"

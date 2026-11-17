@@ -32,6 +32,63 @@ def _get_base_name(name: str) -> Tuple[str, str]:
     return name, ""
 
 
+def _juntar_origens(clips_l: list, clips_r: list) -> None:
+    """O clip estereo que fica leva as chaves de origem do clip R do par."""
+    ordem = lambda c: c.timeline_start_samples  # noqa: E731
+    for cl, cr in zip(sorted(clips_l, key=ordem), sorted(clips_r, key=ordem)):
+        if "origin_keys" in cl.raw and "origin_keys" in cr.raw:
+            cl.raw["origin_keys"] = [*cl.raw["origin_keys"], *cr.raw["origin_keys"]]
+
+
+def _pan_valido(valor) -> float | None:
+    """Pan estatico como float finito entre -1 e 1; None quando nao e."""
+    try:
+        pan = float(valor)
+    except (TypeError, ValueError, OverflowError):
+        return None
+    if not math.isfinite(pan) or not -1.0 <= pan <= 1.0:
+        return None
+    return pan
+
+
+def _pan_do_par(t_l: TrackIR, t_r: TrackIR, base_name: str, report: Report) -> bool | None:
+    """Pan estatico do par: None recusa o par; True quando e L/R complementar."""
+    left_pan = _pan_valido(t_l.pan)
+    right_pan = _pan_valido(t_r.pan)
+    if left_pan is None or right_pan is None:
+        report.warning(
+            "STEREO_PAIR_REJECTED",
+            "Invalid static pan between the channels",
+            {
+                "track": base_name,
+                "reason": "pan_invalid",
+                "left_pan": repr(t_l.pan),
+                "right_pan": repr(t_r.pan),
+            },
+        )
+        return None
+
+    both_centered = math.isclose(left_pan, 0.0, abs_tol=1e-9) and math.isclose(
+        right_pan, 0.0, abs_tol=1e-9
+    )
+    hard_lr = math.isclose(left_pan, -1.0, abs_tol=1e-9) and math.isclose(
+        right_pan, 1.0, abs_tol=1e-9
+    )
+    if not (both_centered or hard_lr):
+        report.warning(
+            "STEREO_PAIR_REJECTED",
+            "Incompatible static pan between the channels",
+            {
+                "track": base_name,
+                "reason": "pan",
+                "left_pan": t_l.pan,
+                "right_pan": t_r.pan,
+            },
+        )
+        return None
+    return hard_lr
+
+
 def process_stereo_pairing(
     session: SessionIR, mode: str, report: Report, extract_dir: Path | None, dry_run: bool = False
 ) -> None:
@@ -71,10 +128,16 @@ def process_stereo_pairing(
             generated_files,
         )
         if success:
+            _juntar_origens(left.clips, right.clips)
             track.clips = left.clips
             total_interleaved_written += written
 
-    for base_name, group in groups.items():
+    for base_name, todas in groups.items():
+        # Uma track sem sufixo com o mesmo nome base (Audio 1 ao lado de
+        # Audio 1_L e Audio 1_R, como no AAF do Premiere) nao impede o par.
+        # Outros sufixos (C, Ls, LFE de um 5.1) continuam impedindo o par.
+        group = [g for g in todas if g[2]]
+        homonima = len(group) < len(todas)
         if len(group) == 2:
             i1, t1, suf1 = group[0]
             i2, t2, suf2 = group[1]
@@ -83,49 +146,8 @@ def process_stereo_pairing(
                 t_r = t2 if suf2 == "R" else t1
                 i_r = i2 if suf2 == "R" else i1
 
-                try:
-                    left_pan = float(t_l.pan)
-                    right_pan = float(t_r.pan)
-                except (TypeError, ValueError, OverflowError):
-                    left_pan = right_pan = None
-
-                if (
-                    left_pan is None
-                    or right_pan is None
-                    or not math.isfinite(left_pan)
-                    or not math.isfinite(right_pan)
-                    or not -1.0 <= left_pan <= 1.0
-                    or not -1.0 <= right_pan <= 1.0
-                ):
-                    report.warning(
-                        "STEREO_PAIR_REJECTED",
-                        "Invalid static pan between the channels",
-                        {
-                            "track": base_name,
-                            "reason": "pan_invalid",
-                            "left_pan": repr(t_l.pan),
-                            "right_pan": repr(t_r.pan),
-                        },
-                    )
-                    continue
-
-                both_centered = math.isclose(left_pan, 0.0, abs_tol=1e-9) and math.isclose(
-                    right_pan, 0.0, abs_tol=1e-9
-                )
-                hard_lr = math.isclose(left_pan, -1.0, abs_tol=1e-9) and math.isclose(
-                    right_pan, 1.0, abs_tol=1e-9
-                )
-                if not (both_centered or hard_lr):
-                    report.warning(
-                        "STEREO_PAIR_REJECTED",
-                        "Incompatible static pan between the channels",
-                        {
-                            "track": base_name,
-                            "reason": "pan",
-                            "left_pan": t_l.pan,
-                            "right_pan": t_r.pan,
-                        },
-                    )
+                hard_lr = _pan_do_par(t_l, t_r, base_name, report)
+                if hard_lr is None:
                     continue
 
                 success, written = par_com_transacao(
@@ -136,6 +158,7 @@ def process_stereo_pairing(
                     generated_files,
                 )
                 if success:
+                    _juntar_origens(t_l.clips, t_r.clips)
                     if hard_lr:
                         t_l.pan = 0.0
                         report.info(
@@ -145,6 +168,8 @@ def process_stereo_pairing(
                             {"track": base_name},
                         )
                     total_interleaved_written += written
+                    if homonima:
+                        t_l.name = f"{base_name} L/R"
                     t_l.original_source_indices.extend(t_r.original_source_indices)
                     to_remove.add(i_r)
 
@@ -317,7 +342,7 @@ def _try_pair(
         except Exception as exc:
             report.warning(
                 "STEREO_INTERLEAVE_FAILED",
-                f"Could not interleave {path_l.name}+{path_r.name}: {exc}",
+                f"Could not interleave {path_l.name}+{path_r.name}: {type(exc).__name__}: {exc}",
                 {"track": base_name},
             )
             return False, files_written

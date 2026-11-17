@@ -114,14 +114,24 @@ def _import_webview() -> Any:
 def _backend(window: Any, webview: Any) -> dialogs.WindowBackend:
     """The backend of the dialogs of the studio: the dialogs of the window."""
 
-    def backend(kind: str, label: str, extensions: list[str], title: str) -> str | None:
-        """Opens the dialog of the window and gives back the chosen path."""
+    def backend(
+        kind: str,
+        label: str,
+        extensions: list[str],
+        title: str,
+        folder: str = "",
+        name: str = "",
+    ) -> str | None:
+        """Opens the dialog of the window and gives back the chosen path.
+
+        The dialog opens in ``folder``; the save dialog offers ``name``.
+        """
         if not window.events.shown.wait(SHOWN_TIMEOUT):
             raise dialogs.DialogError("the window did not open")
         dialog_type = getattr(webview.FileDialog, DIALOG_KINDS.get(kind, "OPEN"))
         file_types = _file_types(label, extensions) if kind != "folder" else ()
-        save_name = _save_name(kind, extensions)
-        answer = window.create_file_dialog(dialog_type, "", False, save_name, file_types)
+        save_name = name if kind == "save_file" else ""
+        answer = window.create_file_dialog(dialog_type, folder, False, save_name, file_types)
         return _first_path(answer)
 
     return backend
@@ -133,13 +143,6 @@ def _file_types(label: str, extensions: list[str]) -> tuple[str, ...]:
         return ("All files (*.*)",)
     pattern = ";".join(f"*.{extension}" for extension in extensions)
     return (f"{label} ({pattern})", "All files (*.*)")
-
-
-def _save_name(kind: str, extensions: list[str]) -> str:
-    """The name the save dialog offers: untitled with the first extension."""
-    if kind != "save_file":
-        return ""
-    return f"untitled.{extensions[0]}" if extensions else "untitled"
 
 
 def _first_path(answer: Any) -> str | None:

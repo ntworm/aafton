@@ -53,10 +53,17 @@ def read_unsupported_mix(ctx: ReadContext, root: ET.Element) -> None:
 
 
 def _le_envelopes_dos_clips(ctx: ReadContext, node: ET.Element, nome_track: str) -> None:
-    """Le o envelope de automacao de cada clip de uma track de audio."""
+    """Le o envelope de automacao de cada clip de uma track de audio.
+
+    O clip que a leitura deixou de fora sai com o envelope dele: o no e
+    pulado pela identidade, porque dois clips de mesmo nome na mesma track
+    dariam a mesma mensagem.
+    """
     for clip in node.findall(
         "DeviceChain/MainSequencer/Sample/ArrangerAutomation/Events/AudioClip"
     ):
+        if ctx.render.deixado(clip):
+            continue
         _le_envelope_do_clip(ctx, clip, nome_track)
 
 

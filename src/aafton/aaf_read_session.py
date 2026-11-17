@@ -151,12 +151,8 @@ def _taxa_do_descritor(descritor) -> int | None:
         return None
 
 
-def _session_sample_rate(f, report: Report) -> int:
-    """Taxa de amostragem da sessao, tirada dos descritores de midia.
-
-    Nao pode sair do edit_rate do slot: nos fixtures, Premiere e Pro Tools
-    declaram edit_rate 24, que e taxa de frame, nao de sample.
-    """
+def _taxas_dos_descritores(f) -> dict[int, int]:
+    """Contagem das taxas de amostragem declaradas nos descritores de midia."""
     taxas: dict[int, int] = {}
     for mob in f.content.mobs:
         taxa = _taxa_do_descritor(getattr(mob, "descriptor", None))
@@ -168,20 +164,28 @@ def _session_sample_rate(f, report: Report) -> int:
             continue
         if valor > 1000:
             taxas[valor] = taxas.get(valor, 0) + 1
-    if not taxas:
-        report.warning(
-            "AAF_NO_SAMPLE_RATE",
-            "no media descriptor declares a sample rate; assuming 48000",
-            {},
-        )
+    return taxas
+
+
+def _session_sample_rate(f, report: Report, slot_rate: int | None = None) -> int:
+    """Taxa da sessao: slots de audio quando unanimes (>1000 Hz), senao descritores.
+
+    Premiere e Pro Tools declaram edit_rate 24 (taxa de frame, nao de sample)
+    nos slots; nesses casos vale a maioria dos descritores de midia.
+    """
+    taxas = _taxas_dos_descritores(f)
+    if slot_rate is not None:
+        escolhida, motivo = slot_rate, "from the composition audio slots' edit_rate"
+    elif not taxas:
+        msg = "no media descriptor declares a sample rate; assuming 48000"
+        report.warning("AAF_NO_SAMPLE_RATE", msg, {})
         return 48000
-    escolhida = max(taxas, key=lambda k: taxas[k])
+    else:
+        escolhida = max(taxas, key=lambda k: taxas[k])
+        motivo = "by media descriptor majority"
     if len(taxas) > 1:
-        report.warning(
-            "AAF_MIXED_SAMPLE_RATES",
-            f"the AAF mixes sample rates {sorted(taxas)}; {escolhida} was adopted",
-            {"rates": sorted(taxas)},
-        )
+        msg = f"the AAF mixes sample rates {sorted(taxas)}; {escolhida} was adopted {motivo}"
+        report.warning("AAF_MIXED_SAMPLE_RATES", msg, {"rates": sorted(taxas)})
     return escolhida
 
 

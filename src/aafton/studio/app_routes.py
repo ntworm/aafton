@@ -16,7 +16,8 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from .. import __version__
-from . import app_convert, app_read, dialogs
+from . import app_collect, app_convert, app_organize, app_read, app_reconform, dialogs
+from .app_messages import falha_do_motor, mensagem_de_arquivo
 from .app_read import error
 
 if TYPE_CHECKING:
@@ -57,7 +58,7 @@ def handle_get(handler: StudioRequestHandler, path: str) -> bool:
     try:
         return _rotas_get(handler, path)
     except Exception as exc:  # noqa: BLE001 - the message of the engine is the answer
-        _responde(handler, error("failed", str(exc)))
+        _responde(handler, error("failed", falha_do_motor(exc, None, "read")))
         return True
 
 
@@ -76,8 +77,21 @@ def handle_post(handler: StudioRequestHandler, path: str, payload: dict) -> bool
     try:
         return _rotas_post(handler, path, payload)
     except Exception as exc:  # noqa: BLE001 - the message of the engine is the answer
-        _responde(handler, error("failed", str(exc)))
+        _responde(handler, error("failed", falha_do_motor(exc, None, "read")))
         return True
+
+
+# Rotas POST servidas como funcoes dict -> dict. O nome e resolvido a cada
+# chamada, para que a troca de uma funcao do modulo (teste, recarga) valha.
+POST_HANDLERS = {
+    "/api/app/read": (app_read, "read"),
+    "/api/app/organize": (app_organize, "organize"),
+    "/api/app/convert": (app_convert, "convert"),
+    "/api/collect/read": (app_collect, "read"),
+    "/api/collect/run": (app_collect, "run"),
+    "/api/reconform/read": (app_reconform, "read"),
+    "/api/reconform/run": (app_reconform, "run"),
+}
 
 
 def _rotas_post(handler: StudioRequestHandler, path: str, payload: dict) -> bool:
@@ -85,11 +99,10 @@ def _rotas_post(handler: StudioRequestHandler, path: str, payload: dict) -> bool
     if path == "/api/app/browse":
         _browse(handler, payload)
         return True
-    if path == "/api/app/read":
-        _responde(handler, app_read.read(payload))
-        return True
-    if path == "/api/app/convert":
-        _responde(handler, app_convert.convert(payload))
+    direto = POST_HANDLERS.get(path)
+    if direto is not None:
+        modulo, nome = direto
+        _responde(handler, getattr(modulo, nome)(payload))
         return True
     if path == "/api/app/open":
         _responde(handler, _open(payload))
@@ -157,6 +170,7 @@ def _browse(handler: StudioRequestHandler, payload: dict) -> None:
         kind=str(payload.get("kind") or "open_file"),
         filter_type=str(payload.get("filter") or "all"),
         title=str(payload.get("title") or "Select"),
+        initial=str(payload.get("initial") or "").strip() or None,
     )
     if "error" in result:
         _responde(
@@ -191,25 +205,29 @@ def _ultimo_arquivo(direction: str) -> Path | None:
 
 def _open(payload: dict) -> dict:
     """Opens the last file written in the direction with the default program."""
-    saida = _ultimo_arquivo(str(payload.get("direction") or ""))
-    if saida is None:
-        return error("nothing", "There is no file to open yet.")
-    try:
-        launch(saida)
-    except OSError as exc:
-        return error("nothing", f"The file {saida} could not be opened ({exc}).")
-    return {"ok": True, "path": str(saida)}
+    return _no_sistema(payload, "open", "There is no file to open yet.")
 
 
 def _reveal(payload: dict) -> dict:
     """Shows the last file written in the direction in the folder that holds it."""
+    return _no_sistema(payload, "show", "There is no file to show yet.")
+
+
+def _no_sistema(payload: dict, acao: str, vazio: str) -> dict:
+    """Entrega o ultimo arquivo escrito ao sistema: abre (open) ou mostra (show).
+
+    O arquivo e conferido antes: o Explorer nunca falha (``check=False``), e
+    um arquivo que sumiu daria so uma janela vazia ou o erro cru do sistema.
+    """
     saida = _ultimo_arquivo(str(payload.get("direction") or ""))
     if saida is None:
-        return error("nothing", "There is no file to show yet.")
+        return error("nothing", vazio)
+    if not saida.is_file():
+        return error("nothing", mensagem_de_arquivo(FileNotFoundError(), saida, acao))
     try:
-        reveal(saida)
+        (launch if acao == "open" else reveal)(saida)
     except OSError as exc:
-        return error("nothing", f"The file {saida} could not be shown ({exc}).")
+        return error("nothing", mensagem_de_arquivo(exc, saida, acao))
     return {"ok": True, "path": str(saida)}
 
 
@@ -232,5 +250,5 @@ def _report(payload: dict) -> dict:
     try:
         arquivo.write_text(texto, encoding="utf-8")
     except OSError as exc:
-        return error("bad_request", f"The report could not be written ({exc}).")
+        return error("bad_request", mensagem_de_arquivo(exc, arquivo, "write"))
     return {"ok": True, "path": str(arquivo)}

@@ -2,11 +2,13 @@
 
 import gzip
 import xml.etree.ElementTree as ET
+from fractions import Fraction
 from pathlib import Path
 
 import pytest
 
 from aafton.aaf_read import read_aaf
+from aafton.als_ancora import StartSpec
 from aafton.als_preflight import ScannedTrack
 from aafton.als_read import read_session as read_session_do_set
 from aafton.pipeline import ImportOptions, import_session
@@ -16,6 +18,7 @@ from aafton.studio import app_convert, app_read, app_set
 from aafton.timecode import TimecodeRate
 from aafton.verify import VerifyResult, VerifyRow
 from tests.aaf_factory import build_calibration_aaf, wav_bytes
+from tests.unit.test_als_sem_sidecar import ESTICADO_104, clip, escrever_wav, montar_set
 
 TEMPLATE = Path("templates/live12.als")
 
@@ -113,7 +116,10 @@ def test_a_leitura_mostra_o_que_pode_voltar_e_o_que_precisa_de_render(set_live):
     assert linhas[2]["state"] == {"st": "off", "label": "not exported"}
     assert linhas[2]["pick"] is None
     assert resultado["guide"] == []
+    assert resultado["made_in"] == "aafton"
+    assert resultado["start"] is None
     assert [fato["k"] for fato in resultado["facts"]] == [
+        "Made in",
         "Live",
         "Sample rate",
         "Timecode",
@@ -121,6 +127,7 @@ def test_a_leitura_mostra_o_que_pode_voltar_e_o_que_precisa_de_render(set_live):
         "Tracks",
         "Media",
     ]
+    assert resultado["facts"][0]["v"] == "aafton"
 
 
 def test_um_set_sem_o_sidecar_mas_com_o_locator_e_lido(set_live, tmp_path):
@@ -134,16 +141,17 @@ def test_um_set_sem_o_sidecar_mas_com_o_locator_e_lido(set_live, tmp_path):
     assert [linha["name"] for linha in resultado["tracks"]][:2] == ["DIALOGO 1", "DIALOGO 2"]
 
 
-def test_um_set_sem_o_sidecar_e_sem_o_locator_da_erro_de_ancoragem(tmp_path):
+def test_um_set_sem_o_sidecar_e_sem_o_locator_e_lido_a_partir_de_01h(tmp_path):
+    """Sem registro do aafton a leitura assume 01:00:00:00 a 24 fps: NO_ANCHOR saiu."""
     caminho = _set_com_midi(tmp_path)
     copia = tmp_path / "sem_nada.als"
     copia.write_bytes(caminho.read_bytes())
 
     resultado = app_set.read_set({"direction": "to_aaf", "input": str(copia)})
 
-    assert resultado["ok"] is False
-    assert resultado["error"]["code"] == "no_anchor"
-    assert ".aafton.json" in resultado["error"]["message"]
+    assert resultado["ok"] is True
+    assert [linha["kind"] for linha in resultado["tracks"]] == ["MIDI"]
+    assert not hasattr(app_set, "NO_ANCHOR")
 
 
 def test_um_arquivo_que_nao_existe_e_um_formato_desconhecido_dao_erro(tmp_path):
@@ -151,7 +159,10 @@ def test_um_arquivo_que_nao_existe_e_um_formato_desconhecido_dao_erro(tmp_path):
     sumiu = app_set.read_set({"direction": "to_aaf", "input": str(sumiu_path)})
     assert sumiu["ok"] is False
     assert sumiu["error"]["code"] == "not_found"
-    assert sumiu["error"]["message"] == f"The file {sumiu_path} was not found."
+    assert sumiu["error"]["message"] == (
+        f"{sumiu_path.name} is no longer at {sumiu_path.parent}. "
+        "It may have been moved, renamed or deleted. Choose the file again."
+    )
 
     outro = tmp_path / "notas.txt"
     outro.write_text("oi", encoding="utf-8")
@@ -553,8 +564,8 @@ def test_uma_selecao_sem_track_da_erro_de_tracks_e_nao_escreve_nada(set_live, tm
 
 
 def test_o_modo_estrito_para_no_erro_e_nao_escreve_nada(set_live, tmp_path, monkeypatch):
-    def leitura_com_erro(caminho, report):
-        session = read_session_do_set(caminho, report)
+    def leitura_com_erro(caminho, report, **opcoes):
+        session = read_session_do_set(caminho, report, **opcoes)
         report.error("ERRO_DE_LEITURA", "erro em DIALOGO 1", {"track": "DIALOGO 1"})
         return session
 
@@ -574,8 +585,8 @@ def test_o_modo_estrito_para_no_erro_e_nao_escreve_nada(set_live, tmp_path, monk
 
 
 def test_o_modo_permissivo_escreve_o_arquivo_e_conta_as_perdas(set_live, tmp_path, monkeypatch):
-    def leitura_com_erro(caminho, report):
-        session = read_session_do_set(caminho, report)
+    def leitura_com_erro(caminho, report, **opcoes):
+        session = read_session_do_set(caminho, report, **opcoes)
         report.error("ERRO_DE_LEITURA", "erro em DIALOGO 1", {"track": "DIALOGO 1"})
         return session
 
@@ -685,3 +696,59 @@ def test_uma_track_sem_nome_mostra_o_tag_e_recebe_as_issues_do_motor(tmp_path):
     assert linha["reasons"]
     codigos = [nota["code"] for nota in resultado["notes"]["main"]]
     assert "ALS_CLIP_UNREADABLE" in codigos
+
+
+def test_verificacao_no_studio_passa_start_e_leave_out_render(tmp_path, monkeypatch):
+    wav = escrever_wav(tmp_path, "dx.wav")
+    als = montar_set(tmp_path, [("DX", [clip(wav, 0.0, 4.0)])])
+    chamadas = []
+
+    def falso_verify(*args, **kwargs):
+        chamadas.append(kwargs)
+        return VerifyResult(audio_expected=1, audio_compared=1)
+
+    monkeypatch.setattr(app_set, "verify_conversion", falso_verify)
+    pedido = _pedido(
+        als,
+        tmp_path / "saida.aaf",
+        [0],
+        start_tc="10:00:00:00",
+        frame_rate="25",
+        leave_out_render=True,
+    )
+
+    resultado = app_set.convert_to_aaf(pedido)
+
+    assert resultado["ok"] is True
+    assert len(chamadas) == 1
+    assert chamadas[0]["start"] == StartSpec("10:00:00:00", Fraction(25), False)
+    assert chamadas[0]["leave_out_render"] is True
+
+
+def test_studio_converte_e_verifica_set_sem_sidecar(tmp_path):
+    wav = escrever_wav(tmp_path, "stem.wav")
+    tracks = [
+        ("DX", [clip(wav, 0.0, 4.0)]),
+        (
+            "3-Audio",
+            [
+                clip(wav, 0.0, 8.0, nome="esticado", warp=ESTICADO_104),
+                clip(wav, 8.0, 12.0, nome="exato", crossfade=True, loop_start=4.0),
+            ],
+        ),
+    ]
+    als = montar_set(tmp_path, tracks, bpm=104.0)
+    pedido = _pedido(
+        als,
+        tmp_path / "saida.aaf",
+        [0, 1],
+        start_tc="10:00:00:00",
+        frame_rate="25",
+        leave_out_render=True,
+    )
+
+    resultado = app_set.convert_to_aaf(pedido)
+
+    assert resultado["ok"] is True
+    assert resultado["written"] is True
+    assert resultado["verdict"]["word"] == "Positions verified"

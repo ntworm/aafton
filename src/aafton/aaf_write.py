@@ -12,6 +12,7 @@ from pathlib import Path
 import aaf2
 
 from .ir import SessionIR
+from .ir_trim import trim_to_media_end
 from .report import Report
 from .timecode import TimecodeRate, samples_to_frames_exact
 
@@ -22,7 +23,6 @@ from .aaf_write_check import (
 )
 from .aaf_write_preflight import (
     _is_supported_transition as _is_supported_transition,
-    _transition_conflicts_with_automation as _transition_conflicts_with_automation,
     _validate_session_overlaps as _validate_session_overlaps,
 )
 from .aaf_write_defs import (
@@ -144,9 +144,8 @@ def _reportar_pan_automacao(track, report: Report) -> None:
 def _transicoes_consumidas(track, pulados: set[int]) -> tuple[set[int], set[int]]:
     """Fades simetricos que viram Transitions, por canal da track.
 
-    Um par que conflita com a automacao segmentada nao vira Transition, e
-    por isso nao consome os fades: eles seguem o caminho do fade
-    independente, como envelope de ganho ou como erro no relatorio.
+    Cada clip vai ao AAF inteiro, com o proprio envelope de ganho, entao a
+    automacao dentro do crossfade nao impede a Transition.
 
     O par e formado pelos clips que o writer escreve: o clip que fica fora do
     AAF (`pulados`) nao faz par com ninguem, e os seus vizinhos fazem par um
@@ -162,10 +161,6 @@ def _transicoes_consumidas(track, pulados: set[int]) -> tuple[set[int], set[int]
         for previous, current in zip(ordered, ordered[1:]):
             overlap = previous.timeline_end_samples - current.timeline_start_samples
             if overlap > 0 and _is_supported_transition(previous, current, overlap):
-                if _transition_conflicts_with_automation(
-                    previous, current, overlap, track.gain_points
-                ):
-                    continue
                 consumed_out.add(id(previous))
                 consumed_in.add(id(current))
     return consumed_in, consumed_out
@@ -466,6 +461,11 @@ def write_aaf(
 
     if media not in ("link", "embed"):
         raise ValueError(f"invalid media mode: {media!r}")
+
+    # Corta no proprio SessionIR de quem chamou o clip que passa menos de um
+    # frame do fim da midia; a mudanca no lugar e aceita e vale para as tres
+    # entradas do export (CLI, Studio e web app).
+    trim_to_media_end(session, report)
 
     # consumed_in e consumed_out reunem os fades consumidos de todas as tracks nao-video.
     rate, consumed_in, consumed_out = _preflight(session, report)

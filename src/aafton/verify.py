@@ -2,15 +2,18 @@
 
 from __future__ import annotations
 
+from collections.abc import Collection
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from .als_read import read_session
+from .expandir_verify import check_siblings, read_without_siblings
 from .formats.origem import ler_origem_verify, read_aaf
 from .ir import ClipIR, SessionIR, TrackIR
+from .ir_trim import MEASURED_STATUSES, TRIMMED_STATUS, media_end_status, samples_per_frame
 from .report import Report
 from .timecode import samples_to_label
 from .verify_coverage import formatar_cobertura, mapeamento_de_slots, slots_por_track
+from .verify_organize import rebuild_organized_destination, verify_da_volta
 
 import aaf2
 
@@ -42,6 +45,9 @@ class VerifyResult:
     audio_missing: int = 0
     audio_extra: int = 0
     errors: list[str] = field(default_factory=list)
+    out_of_scope: str = (
+        "media offset, audio content, clip gain/fader/pan and envelopes were not verified"
+    )
 
     @property
     def ok(self) -> bool:
@@ -49,19 +55,20 @@ class VerifyResult:
             return False
         if self.audio_compared != self.audio_expected:
             return False
-        if self.audio_missing != 0 or self.audio_extra != 0:
+        if (self.audio_missing, self.audio_extra) != (0, 0):
             return False
         if len(self.errors) > 0:
             return False
         for linha in self.rows:
             if linha.is_audio:
-                if linha.status != "ok":
+                if linha.status not in ("ok", TRIMMED_STATUS):
                     return False
                 if linha.delta_end_samples is None:
                     return False
                 if abs(linha.delta_samples) > self.tolerance_samples:
                     return False
-                if abs(linha.delta_end_samples) > self.tolerance_samples:
+                # O fim do clip cortado no fim da midia ja foi conferido no estado.
+                if linha.status == "ok" and abs(linha.delta_end_samples) > self.tolerance_samples:
                     return False
             else:
                 if linha.status not in ("ok", "presumed"):
@@ -72,7 +79,7 @@ class VerifyResult:
     def max_delta_samples(self) -> int:
         deltas = []
         for linha in self.rows:
-            if linha.status in ("ok", "out of tolerance"):
+            if linha.status in MEASURED_STATUSES:
                 deltas.append(abs(linha.delta_samples))
                 if linha.delta_end_samples is not None:
                     deltas.append(abs(linha.delta_end_samples))
@@ -89,10 +96,7 @@ class VerifyResult:
             linhas.append(f"Errors: {'; '.join(self.errors)}")
         if self.coverage_msg:
             linhas.append(self.coverage_msg)
-        linhas.append(
-            "Fields out of scope: media offset, audio content, clip gain/fader/pan and envelopes "
-            "were not verified."
-        )
+        linhas.append(f"Fields out of scope: {self.out_of_scope}.")
         cabecalho = (
             f"{'TRACK':<16}{'CLIP':<20}{'TC AAF (in-out)':<24}"
             f"{'TC ALS (in-out)':<24}{'D START':>8}{'D END':>8}{'D FRAMES':>9}  STATUS"
@@ -160,8 +164,7 @@ class VerifyResult:
             f"- **Largest deviation**: {self.max_delta_samples} samples",
             f"- **Audio events**: {self.audio_compared} compared of {self.audio_expected} expected "
             f"({self.audio_missing} missing, {self.audio_extra} extra)",
-            "- **Out of scope**: media offset, audio content, clip gain/fader/pan and envelopes "
-            "were not verified",
+            f"- **Out of scope**: {self.out_of_scope}",
         ]
         if self.errors:
             lines.append(f"- **Errors**: {', '.join(self.errors)}")
@@ -177,10 +180,10 @@ class VerifyResult:
         for row in self.rows:
             aaf_range = f"{row.aaf_in}-{row.aaf_out}" if row.aaf_in != "-" else "---"
             als_range = f"{row.als_in}-{row.als_out}" if row.als_in != "-" else "---"
-            d_ini = str(row.delta_samples) if row.status in ("ok", "out of tolerance") else "---"
+            d_ini = str(row.delta_samples) if row.status in MEASURED_STATUSES else "---"
             d_fim = (
                 str(row.delta_end_samples)
-                if row.delta_end_samples is not None and row.status in ("ok", "out of tolerance")
+                if row.delta_end_samples is not None and row.status in MEASURED_STATUSES
                 else "---"
             )
             lines.append(
@@ -242,36 +245,44 @@ def verify_conversion(
     aaf_path: str | Path,
     als_path: str | Path,
     override_tolerance_samples: int | None = None,
+    start=None,
+    leave_out_render: bool = False,
+    tracks: Collection[int] | None = None,
 ) -> VerifyResult:
     """Compara clip a clip o AAF de origem e o .als gerado."""
     if override_tolerance_samples is not None and override_tolerance_samples < 0:
         raise ValueError("Tolerance cannot be negative")
+    from .sidecar import SidecarMissingError, read_anchor, sidecar_path_for
 
-    from .sidecar import SidecarMissingError, read_anchor
+    if not sidecar_path_for(als_path).exists():
+        from .verify_sem_sidecar import verify_sem_sidecar as _sem
+
+        tol = override_tolerance_samples
+        return _sem(aaf_path, als_path, tol, start, leave_out_render, read_aaf, tracks)
+    from .als_crossfade_ler import crossfades_em_sobreposicao
 
     fades_mode = "absorb"
-    stereo_mode = "pair"
+    anchor = None
     try:
         anchor = read_anchor(als_path)
         if getattr(anchor, "fades", None):
             fades_mode = anchor.fades
-        if getattr(anchor, "stereo", None):
-            stereo_mode = anchor.stereo
     except (SidecarMissingError, Exception):
         pass
-
+    volta = verify_da_volta(aaf_path, als_path, anchor, override_tolerance_samples, read_aaf)
+    if volta is not None:
+        return volta(leave_out_render, tracks)
     aaf_report = Report(strict=False)
     origem = ler_origem_verify(aaf_path, aaf_report, fades_mode, als_path, read_aaf)
-
     from .video import process_video
 
-    video_path = getattr(anchor, "video_path", None) if "anchor" in locals() else None
+    video_path = getattr(anchor, "video_path", None)
     video_report = Report(strict=False)
     process_video(origem, Path(aaf_path), video_path, None, video_report)
-
     als_report = Report(strict=False)
-    destino = read_session(als_path, als_report)
-
+    destino, irmas = read_without_siblings(als_path, als_report, origem, aaf_path)
+    for sessao in (origem, destino):
+        crossfades_em_sobreposicao(sessao)
     collected_errors: list[str] = []
     for rep in (aaf_report, video_report, als_report):
         for issue in rep.issues:
@@ -283,15 +294,12 @@ def verify_conversion(
                 collected_errors.append(f"{issue.code}: {issue.message}")
         if rep.incomplete and not any(i.severity == "error" for i in rep.issues):
             collected_errors.append("Incomplete read")
-
     import xml.etree.ElementTree as ET
     import gzip
 
     root = ET.parse(gzip.open(Path(als_path), "rb")).getroot()
     has_group = len(root.findall(".//LiveSet/Tracks/GroupTrack")) > 0
-
-    source_indices = getattr(anchor, "audio_source_indices", None) if "anchor" in locals() else None
-
+    destino, source_indices = rebuild_organized_destination(destino, anchor, aaf_path)
     origem_indices_por_track = slots_por_track(origem)
     if source_indices is not None:
         normalized_indices = []
@@ -305,17 +313,14 @@ def verify_conversion(
             else:
                 raise ValueError("Invalid audio_source_indices map")
         source_indices = normalized_indices
-
         if len(source_indices) != len(destino.tracks):
             raise ValueError(
                 "Size of the audio_source_indices map differs from the number of AudioTracks in the ALS"
             )
-
         flat_indices = [idx for sublist in source_indices for idx in sublist]
         flat_valid = [idx for idx in flat_indices if idx >= 0]
         if len(flat_valid) != len(set(flat_valid)):
             raise ValueError("The audio_source_indices map contains duplicates")
-
         origem_primary_indices = [track.source_index for track in origem.tracks]
         if len(origem_primary_indices) != len(set(origem_primary_indices)):
             raise ValueError("There are duplicate source_index values in the source")
@@ -334,9 +339,7 @@ def verify_conversion(
                 raise ValueError(
                     f"The set of the audio_source_indices map differs from the source_index values of the source (index {idx} not found)"
                 )
-
         # A origem fica intacta! Nao removemos tracks irmaos para que sejam testadas de verdade.
-
     else:
         if has_group:
             raise ValueError(
@@ -406,7 +409,8 @@ def verify_conversion(
     def rotulo(samples: int) -> str:
         return samples_to_label(samples, rate, sample_rate)
 
-    samples_por_frame = sample_rate * rate.den / rate.num
+    quadro = samples_per_frame(origem)
+    samples_por_frame = float(quadro)
 
     indice_origem = _index(
         origem,
@@ -450,11 +454,7 @@ def verify_conversion(
 
             if is_audio:
                 resultado.audio_compared += 1
-                status = (
-                    "ok"
-                    if (abs(delta_start) <= tolerance and abs(delta_end) <= tolerance)
-                    else "out of tolerance"
-                )
+                status = media_end_status(clip_origem, clip_destino, destino, tolerance, quadro)
                 resultado.rows.append(
                     VerifyRow(
                         track=track_name,
@@ -560,4 +560,4 @@ def verify_conversion(
         resultado, mapeamento_de_slots(origem, source_indices)
     )
 
-    return resultado
+    return check_siblings(resultado, irmas)

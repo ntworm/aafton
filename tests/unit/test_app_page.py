@@ -171,3 +171,48 @@ def test_the_script_writes_no_backslash_x_escape():
     script = _script_part(load_page())
     assert "\\x" not in script
     assert script.isascii()
+
+
+def test_live_to_aaf_has_start_fields_and_leave_out_hidden_when_empty():
+    html = _static("index.html")
+    start = html.index('id="panel-to-aaf"')
+    end = html.index('id="panel-pa"')
+    panel = html[start:end]
+    script = _script_part(load_page())
+
+    assert 'data-f="facts"' in panel
+    assert '<div class="start-wrap" data-f="start-wrap" hidden>' in panel
+    assert 'data-f="start_tc"' in panel
+    assert 'value="01:00:00:00"' in panel
+    for fps in ("23.976", "24", "25", "29.97", "30"):
+        assert f'name="b-fps" value="{fps}"' in panel
+    assert '<input type="radio" name="b-fps" value="24" checked>' in panel
+    assert 'data-f="guide-text"' in panel
+    assert (
+        '<button class="btn btn-quiet" type="button" data-act="leave-out-render" hidden>'
+        "Leave them out</button>"
+    ) in panel
+    assert "App.syncStart = (p, data) => {" in script
+    assert "wrap.hidden = !start;" in script
+    assert "leave.hidden = !canLeave;" in script
+    assert "App.updateRuler = (p) => {" in script
+    assert "App.applyLeaveOut = (p) => {" in script
+
+
+def test_the_collect_media_tab_panel_and_export_checkboxes_are_in_the_page():
+    """A pagina servida traz a aba Collect media, o painel e as duas caixas no export."""
+    page = load_page()
+    assert 'id="tab-collect"' in page
+    assert "Collect media</button>" in page
+    assert 'id="panel-collect"' in page
+    assert "The Live set or the linked AAF to collect. It is only read, never changed." in page
+    assert "Every file the session uses, and what happens to it." in page
+    assert "The folder gets the session copy and its Media/ folder. It must be empty." in page
+    assert "<span>Include picture</span>" in page
+    assert "<span>Collect media next to the set</span>" in page
+    assert "Copies every file the set uses into &lt;set name&gt; Media/ beside it." in page
+    assert "<span>Collect media next to the AAF</span>" in page
+    assert (
+        "Copies every linked file into &lt;AAF name&gt; Media/ beside it. "
+        "Only with Format AAF and Link files."
+    ) in page

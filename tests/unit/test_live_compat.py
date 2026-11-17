@@ -196,17 +196,17 @@ def test_perda_antes_continua_na_coluna_depois_quando_a_devolucao_nao_muda(tmp_p
     assert depois.valor == pytest.approx(antes.valor)
 
 
-def test_apagar_o_clip_que_entra_no_crossfade_conta_tambem_o_que_sai(tmp_path):
-    """Na forma nativa o clip que sai termina na juncao.
+def test_apagar_o_clip_que_entra_no_crossfade_conta_so_ele(tmp_path):
+    """Na forma nativa medida o clip que sai fica com o fim do AAF.
 
-    Apagar o clip que entra deixa o que sai 24000 samples curto, e a metrica
-    conta a perda: o corte e visivel, nao escondido.
+    O crossfade toca antes da juncao, que e o fim do clip que sai: apagar o
+    clip que entra perde so ele, e o que sai continua exato.
     """
     conversao = _conversao_com_dois_clips(tmp_path)
     entrada = _sem_um_clip(conversao.als, tmp_path / "entrada.als")
     antes = perfeicao_antes(Conversao(conversao.aaf, entrada, 0, conversao.relatorio), "Pro Tools")
-    assert (antes.entrada, antes.exatos, antes.perdas_d) == (2, 0, 1)
-    assert antes.valor == pytest.approx(-1.0)
+    assert (antes.entrada, antes.exatos, antes.perdas_d) == (2, 1, 1)
+    assert antes.valor == pytest.approx(-0.5)
     depois = perfeicao_depois(
         conversao.aaf, entrada, [], "Pro Tools", perdas_abertas_antes=antes.perdas_d
     )
@@ -214,8 +214,7 @@ def test_apagar_o_clip_que_entra_no_crossfade_conta_tambem_o_que_sai(tmp_path):
     assert depois.valor == pytest.approx(antes.valor)
     resultado = verify_conversion(conversao.aaf, entrada)
     linhas = [linha for linha in resultado.rows if linha.is_audio]
-    curtos = [linha for linha in linhas if linha.delta_end_samples == -24000]
-    assert len(curtos) == 1
+    assert not [linha for linha in linhas if linha.delta_end_samples == -24000]
 
 
 def test_perda_nova_do_live_entra_uma_vez_na_coluna_depois(tmp_path):

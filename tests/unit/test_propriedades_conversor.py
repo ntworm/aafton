@@ -301,16 +301,28 @@ def test_todo_tempo_do_als_e_batida_com_a_mesma_origem(nome, convertidas):
         inicio = _valor(clip, "CurrentStart")
         assert Fraction(clip.get("Time")) == inicio, "o atributo Time descolou de CurrentStart"
         # O arranjo usa o relogio de clip do Live (perfil nativo, R03) e a fonte nao:
-        # as duas duracoes so precisam cair na mesma amostra.
+        # as duas duracoes so precisam cair na mesma amostra. Os marcadores de
+        # loop do clip sem warp sao segundos do arquivo.
         no_arranjo = _amostras(_valor(clip, "CurrentEnd") - inicio, ancora)
-        na_fonte = _amostras(_valor(clip, "Loop/LoopEnd") - _valor(clip, "Loop/LoopStart"), ancora)
+        loop = _valor(clip, "Loop/LoopEnd") - _valor(clip, "Loop/LoopStart")
+        na_fonte = loop * ancora.sample_rate
         assert round(no_arranjo) == round(na_fonte), (
             f"{nome}: a duracao no arranjo ({float(no_arranjo)} amostras) e na fonte "
             f"({float(na_fonte)}) nao caem na mesma amostra: unidades diferentes"
         )
-        inicios_als.append(round(ancora.live_origin_samples + _amostras(inicio, ancora)))
-    inicios_aaf = {clip.timeline_start_samples for clip in _clips_de_audio(conversao.aaf)}
-    fora = sorted(set(inicios_als) - inicios_aaf)
+        entra = clip.find("Fades/CrossfadeInState")
+        no_crossfade = entra is not None and entra.get("Value") == "1"
+        inicio_samples = round(ancora.live_origin_samples + _amostras(inicio, ancora))
+        inicios_als.append((inicio_samples, no_crossfade))
+    clips_aaf = _clips_de_audio(conversao.aaf)
+    inicios_aaf = {clip.timeline_start_samples for clip in clips_aaf}
+    # Na forma nativa do crossfade o clip que entra comeca no fim do que sai.
+    fins_aaf = {clip.timeline_end_samples for clip in clips_aaf}
+    fora = sorted(
+        inicio
+        for inicio, no_crossfade in inicios_als
+        if inicio not in inicios_aaf and not (no_crossfade and inicio in fins_aaf)
+    )
     assert not fora, (
         f"{nome}: inicios do .als que nao sao inicio de clip no AAF: {fora[:5]} "
         "(frame tratado como sample, ou origem diferente da do sidecar)"

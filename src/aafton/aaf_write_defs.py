@@ -95,6 +95,17 @@ class AafBuilder:
             )
         return rational
 
+    def wrap_mute(self, segment, length: int):
+        """Clip mudo na forma do Avid e do Pro Tools.
+
+        Um Selector cujo Selected e um Filler e cujo material fica nos
+        Alternates: o clip continua na timeline e o editor so o desmuta.
+        """
+        selector = self.f.create.Selector(media_kind="sound", length=length)
+        selector["Selected"].value = self.f.create.Filler(media_kind="sound", length=length)
+        selector["Alternates"].value = [segment]
+        return selector
+
     def wrap_audio_gain(self, segment, length: int, value: float):
         """Envolve o segmento em um grupo de operacao de ganho constante."""
         if value == 1.0:

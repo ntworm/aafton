@@ -31,7 +31,7 @@ from .als_read import _media_path
 from .als_xml import load_als
 from .ir import MediaAsset, SessionIR
 from .report import Report
-from .turnover import _iter_descriptors
+from .collect_aaf import iter_descriptors
 
 # Orcamento de compatibilidade com o MAX_PATH legado do Windows: 259
 # caracteres, contados em unidades UTF-16. E um orcamento conservador, para
@@ -136,7 +136,7 @@ def _reescrever_locators(copia: Path, portadoras: dict[str, Portadora], midia: P
 
     with aaf2.open(str(copia), "rw") as arquivo:
         for mob in arquivo.content.sourcemobs():
-            for descritor in _iter_descriptors(getattr(mob, "descriptor", None)):
+            for descritor in iter_descriptors(getattr(mob, "descriptor", None)):
                 _reescrever_descritor(descritor, portadoras, midia)
 
 

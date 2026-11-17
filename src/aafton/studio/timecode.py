@@ -23,7 +23,7 @@ from ..live_osc import (
 )
 from ..ltc import RATES_LTC
 from ..report import Report
-from ..sidecar import Anchor, SidecarMissingError, read_anchor
+from ..sidecar import Anchor, SidecarMissingError, read_anchor, resolve_video_path
 from ..timecode import label_to_samples, samples_to_label
 from .page import load_timecode_page
 
@@ -169,7 +169,8 @@ class TimecodeBridge:
             for clip in track.clips:
                 if track.is_video:
                     offset = clip.source_offset_samples or 0
-                    return (Path(anchor.video_path), clip.timeline_start_samples, offset)
+                    caminho = resolve_video_path(anchor.video_path, Path(als_path))
+                    return (caminho, clip.timeline_start_samples, offset)
         return None
 
     @_travado

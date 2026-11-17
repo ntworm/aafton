@@ -374,3 +374,16 @@ def test_o_combiner_recusado_nao_deixa_a_sessao_pela_metade(tmp_path, quatro_fon
     assert [i.code for i in report.issues if i.code == "STEREO_INTERLEAVE_FAILED"]
     assert dataclasses.asdict(sessao) == antes
     assert len(sessao.tracks) == 1
+
+
+def test_nome_do_canal_troca_o_sufixo_em_vez_de_somar():
+    from aafton.aaf_write_media import _target_clip_name
+
+    assert _target_clip_name("Earthquake 6048_75-10.L", 1, True) == "Earthquake 6048_75-10.R"
+    assert _target_clip_name("Earthquake 6048_75-10.L", 0, True) == "Earthquake 6048_75-10.L"
+    assert _target_clip_name("Boom-L", 1, True) == "Boom-R"
+    assert _target_clip_name("Boom_R", 0, True) == "Boom_L"
+    assert _target_clip_name("Fade 18", 0, True) == "Fade 18.L"
+    assert _target_clip_name("Fade 18", 1, True) == "Fade 18.R"
+    assert _target_clip_name("Fade 18", 2, True) == "Fade 18"
+    assert _target_clip_name("Fade 18.L", 1, False) == "Fade 18.L"

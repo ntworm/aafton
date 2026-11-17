@@ -1,6 +1,6 @@
 """Studio page assembled from the static files.
 
-The markup, the stylesheet and the three scripts of ``SCRIPTS`` live in
+The markup, the stylesheet and the five scripts of ``SCRIPTS`` live in
 ``static/``. The page served by ``GET /`` is the markup with the stylesheet
 and the scripts, joined in the order of ``SCRIPTS``, put in the place of the
 two markers the markup holds.
@@ -12,7 +12,15 @@ CSS_MARK = "/*__STUDIO_CSS__*/"
 JS_MARK = "/*__STUDIO_JS__*/"
 
 # The scripts of the page, in the order they enter the same script.
-SCRIPTS = ("app-core.js", "app-sheet.js", "app-flow.js")
+SCRIPTS = (
+    "app-core.js",
+    "app-sheet.js",
+    "app-pa.js",
+    "app-organize.js",
+    "app-collect.js",
+    "app-reconform.js",
+    "app-flow.js",
+)
 
 
 def _static(nome: str) -> str:

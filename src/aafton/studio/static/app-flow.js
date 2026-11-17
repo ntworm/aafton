@@ -3,23 +3,6 @@
 
 // --- the read ------------------------------------------------------------
 
-// The media that was not found, and the files the engine found beside the
-// source.
-App.renderMedia = (p, media) => {
-  const data = media || {};
-  const box = App.slot(p.el, "media-missing");
-  if (box) box.hidden = !(Number(data.missing || 0) > 0);
-  App.fill(p.el, "media-missing-text", data.missing_text || "");
-};
-
-App.renderSuggestions = (p, suggest) => {
-  const data = suggest || {};
-  const video = App.slot(p.el, "video");
-  if (video) video.placeholder = App.placeholder(p, "video", data.video);
-  const text = App.slot(p.el, "session_text");
-  if (text) text.placeholder = App.placeholder(p, "session_text", data.session_text);
-};
-
 // The destination of the conversion, when the user did not choose one.
 App.fillOutput = (p, suggest, value, previous) => {
   const data = suggest || {};
@@ -49,18 +32,20 @@ App.read = async (p, force) => {
     App.resetRead(p);
     return;
   }
+  if (p.direction === "reconform" && !App.reconformReady(p)) return App.resetRead(p);
   if (!force && p.data && value === p.lastInput) return;
   const previous = p.lastInput;
   const seq = ++p.seq;
   App.setPhase(p, "reading");
   const body = { direction: p.direction, input: value };
   if (p.direction === "to_live") {
-    const audio = App.slot(p.el, "audio_dir");
-    body.audio_dir = audio && audio.value.trim() ? audio.value.trim() : null;
-    const rate = App.radio(p.el, "a-edl-rate");
-    body.edl_rate = rate || null;
+    body.audio_dir = App.text(p.el, "audio_dir") || null;
+    body.edl_rate = App.radio(p.el, "a-edl-rate") || null;
+    body.production_audio = App.productionFolder(p);
   }
-  const res = await App.api("POST", "/api/app/read", body);
+  if (p.direction === "reconform") Object.assign(body, App.reconformFields(p));
+  const route = App.readRoute(p);
+  const res = await App.api("POST", route, body);
   if (seq !== p.seq) return;
   if (!res || !res.ok) {
     const failure = (res && res.error) || {};
@@ -71,18 +56,30 @@ App.read = async (p, force) => {
   }
   p.lastInput = value;
   p.data = res;
-  App.renderFacts(p, res.facts);
-  App.renderTracks(p);
+  App.renderRead(p, res, value, previous);
+  App.setPhase(p, "ready");
+};
+
+App.renderRead = (p, res, value, previous) => {
+  if (p.direction === "collect") {
+    App.renderCollectMedia(p);
+  } else if (p.direction === "reconform") {
+    App.renderReconform(p);
+  } else {
+    App.renderFacts(p, res.facts);
+    App.renderTracks(p);
+  }
   App.renderNotes(p, res.notes);
   if (p.direction === "to_live") {
     App.renderMedia(p, res.media);
     App.renderSuggestions(p, res.suggest);
-  } else {
-    App.renderGuide(p, res.guide);
+    App.afterReadOrganize(p, value, previous);
+  } else if (p.direction === "to_aaf") {
+    App.renderGuide(p, res.guide, res);
+    App.syncStart(p, res);
     App.syncSelection(p);
   }
   App.fillOutput(p, res.suggest, value, previous);
-  App.setPhase(p, "ready");
 };
 
 // --- the options of the conversion ---------------------------------------
@@ -98,26 +95,32 @@ App.gather = (p) => {
   if (p.direction === "to_live") {
     body.audio_dir = App.text(p.el, "audio_dir") || null;
     body.edl_rate = App.radio(p.el, "a-edl-rate") || null;
+    body.production_audio = App.productionFolder(p);
     body.options = {
       stereo: App.radio(p.el, "a-stereo"),
       fades: App.radio(p.el, "a-fades"),
-      groups: App.radio(p.el, "a-groups"),
+      groups: App.organizeGroups(p),
+      organize: App.radio(p.el, "a-organize") || "off",
       template: App.text(p.el, "template"),
       bpm: App.text(p.el, "bpm"),
       live_origin: App.text(p.el, "live_origin"),
       video: App.text(p.el, "video"),
       video_start: App.text(p.el, "video_start"),
       session_text: App.text(p.el, "session_text"),
+      collect_media: App.checked(p.el, "collect_media"),
       ltc: App.checked(p.el, "ltc"),
       mode: App.radio(p.el, "a-mode"),
     };
+    if (body.options.organize === "type") App.addOrganizeOptions(p, body.options);
+  } else if (p.direction === "production") {
+    body.options = App.paOptions(p);
+  } else if (p.direction === "collect") {
+    body.options = App.collectOptions(p);
+  } else if (p.direction === "reconform") {
+    App.reconformGather(p, body);
   } else {
     body.tracks = App.selectedTracks(p);
-    body.options = {
-      media: App.radio(p.el, "b-media"),
-      format: App.radio(p.el, "b-format"),
-      mode: App.radio(p.el, "b-mode"),
-    };
+    body.options = App.aafOptions(p);
   }
   return body;
 };
@@ -135,12 +138,13 @@ App.convert = async (p, extra) => {
   if (exists) exists.hidden = true;
   App.setPhase(p, "working");
   const body = Object.assign(App.gather(p), extra || {});
-  const res = await App.api("POST", "/api/app/convert", body);
+  const route = App.runRoute(p);
+  const res = await App.api("POST", route, body);
   if (!res || !res.ok) {
     const error = (res && res.error) || {};
     App.setPhase(p, "ready");
-    if (error.code === "exists") {
-      if (exists) exists.hidden = false;
+    if (error.code === "exists" && exists) {
+      exists.hidden = false;
       return;
     }
     if (failure) {
@@ -153,6 +157,7 @@ App.convert = async (p, extra) => {
   App.setPhase(p, "done");
   App.renderNotes(p, res.notes);
   App.renderVerdict(p);
+  App.syncCollectVerdict(p, failure);
 };
 
 // The permissive mode of the panel.
@@ -169,10 +174,7 @@ App.resultAction = async (p, act) => {
   if (act === "save-report") {
     const path = await App.browse(p, "save_file", "report", "Save report");
     if (!path) return;
-    const res = await App.api("POST", "/api/app/report", {
-      direction: p.direction,
-      path: path,
-    });
+    const res = await App.api("POST", "/api/app/report", { direction: p.direction, path: path });
     App.reportFailure(p, res);
     return;
   }
@@ -185,43 +187,28 @@ App.resultAction = async (p, act) => {
 // button that was pressed.
 App.browseAction = async (p, act) => {
   if (act === "browse-input") {
-    const filter = p.direction === "to_live" ? "source" : "als";
-    const path = await App.browse(p, "open_file", filter, "Choose the source file");
+    const source = App.inputBrowse(p);
+    const path = await App.browse(p, source.kind, source.filter, source.title);
     if (!path) return;
     const input = App.slot(p.el, "input");
     if (input) input.value = path;
     App.showTail(input);
     App.syncEdl(p);
-    await App.read(p, true);
+    await App.reconformReread(p);
     return;
   }
-  const fields = {
-    "browse-output": { field: "output", kind: "save_file", filter: "als" },
-    "browse-audio-dir": { field: "audio_dir", kind: "folder", filter: "all" },
-    "browse-template": { field: "template", kind: "open_file", filter: "als" },
-    "browse-video": { field: "video", kind: "open_file", filter: "video" },
-    "browse-session-text": { field: "session_text", kind: "open_file", filter: "text" },
-  };
-  const spec = fields[act];
+  const spec = App.outputBrowseSpec(p, act);
   if (!spec) return;
-  let filter = spec.filter;
-  let title = "Choose the file";
-  if (act === "browse-output") {
-    title = p.direction === "to_live" ? "Save the Live set" : "Save the AAF";
-    if (p.direction === "to_aaf") filter = App.radio(p.el, "b-format") || "aaf";
-  } else if (act === "browse-audio-dir") title = "Choose the audio folder";
-  else if (act === "browse-template") title = "Choose a Live template";
-  else if (act === "browse-video") title = "Choose the picture";
-  else if (act === "browse-session-text") title = "Choose the session text";
-  const path = await App.browse(p, spec.kind, filter, title);
+  const path = await App.browse(p, spec.kind, spec.filter, spec.title);
   if (!path) return;
   const field = App.slot(p.el, spec.field);
   if (!field) return;
   field.value = path;
   App.showTail(field);
-  if (spec.field === "output") {
-    p.outputTouched = true;
-  }
+  if (spec.field === "output") p.outputTouched = true;
+  if (spec.field === "production_audio") return App.read(p, true);
+  if (spec.field === "new_cut" || spec.field === "set") return App.reconformReread(p);
+  if (spec.field === "audio_dir") App.refreshOrganize(p);
   App.stale(p);
 };
 
@@ -246,10 +233,9 @@ App.action = (p, act) => {
     App.convert(p, { overwrite: true });
     return;
   }
-  if (act === "reread") {
-    App.read(p, true);
-    return;
-  }
+  if (act === "reread") return App.read(p, true);
+  if (act === "leave-out-render") return App.applyLeaveOut(p);
+  if (act === "org-reset") return App.resetOrganize(p);
   if (act === "open-output" || act === "reveal-output" || act === "save-report") {
     App.resultAction(p, act);
     return;
@@ -279,7 +265,7 @@ App.syncSelection = (p) => {
     const box = App.slot(lane.row, "pick");
     if (!box || !box.checked) continue;
     selected += 1;
-    clips += Number((lane.track || {}).clips || 0);
+    clips += Math.max(0, Number((lane.track || {}).clips || 0) - (p.leaveOutRender ? Number((lane.track || {}).render_clips || 0) : 0));
   }
   const summary = App.slot(p.el, "tracks-summary");
   if (summary) {
@@ -302,13 +288,26 @@ App.onChange = (p, target) => {
     App.read(p, false);
     return;
   }
+  if (App.reconformChange(p, target)) return;
   if (target.name === "a-edl-rate") {
     App.syncEdl(p);
     App.read(p, true);
     return;
   }
+  if (target === App.slot(p.el, "production_audio")) return App.read(p, true);
   if (target.name === "b-format") {
     App.syncFormat(p);
+    App.stale(p);
+    return;
+  }
+  if (App.handleOrganizeChange(p, target)) return;
+  if (target.name === "b-media") {
+    App.syncAafCollect(p);
+    App.stale(p);
+    return;
+  }
+  if (target.matches && target.matches('[data-f="include_video"]')) {
+    if (p.data) App.renderCollectMedia(p);
     App.stale(p);
     return;
   }
@@ -323,6 +322,7 @@ App.onChange = (p, target) => {
     App.stale(p);
     return;
   }
+  if (target.name === "b-fps" || target === App.slot(p.el, "start_tc")) App.updateRuler(p);
   App.stale(p);
 };
 
@@ -337,6 +337,7 @@ App.onInput = (p, target) => {
     p.outputTouched = true;
     App.hideExists(p);
   }
+  if (target === App.slot(p.el, "start_tc")) App.updateRuler(p);
   App.stale(p);
 };
 
@@ -350,7 +351,8 @@ App.wirePanel = (p) => {
     const name = target.closest("button.name");
     if (name) {
       const row = name.closest("tr.row");
-      if (row) App.toggleRow(p, Number(row.dataset.index));
+      if (row && row.dataset.orgKey) App.toggleOrgRow(p, row.dataset.orgKey);
+      else if (row) App.toggleRow(p, Number(row.dataset.index));
       return;
     }
     const button = target.closest("[data-act]");
@@ -379,7 +381,8 @@ App.start = () => {
   }
   App.wireTabs();
   App.loadInfo();
-  App.selectTab(window.location.hash === "#to-aaf" ? "to_aaf" : "to_live", false);
+  const hashed = Object.keys(App.hashes).find((key) => App.hashes[key] === window.location.hash);
+  App.selectTab(hashed || "to_live", false);
 };
 
 App.start();

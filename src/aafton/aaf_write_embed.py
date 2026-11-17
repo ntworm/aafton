@@ -23,6 +23,8 @@ COPY_CHUNK_SIZE = 65536
 SUPPORTED_BITS = (8, 16, 24, 32)
 EXTENSIBLE = 0xFFFE
 IEEE_FLOAT = 3
+# A essencia embutida vai numa taxa so: arquivos de taxas diferentes ficam no Link.
+EMBED_MIXED_RATES = "Embed audio needs every file at one sample rate; use Link files"
 
 
 class _Fmt(NamedTuple):
@@ -339,6 +341,11 @@ def preflight_embed(session: SessionIR, report: Report) -> bool:
         else:
             eligible_asset_ids.add(asset.id)
             total += asset_data
+
+    taxas = sorted({asset.sample_rate for asset in assets if asset.sample_rate})
+    if len(taxas) > 1:
+        report.error("WRITE_EMBED_MIXED_RATES", EMBED_MIXED_RATES, {"sample_rates": taxas})
+        has_error = True
 
     clip_code, clip_message, clip_context = _validate_clips(session, eligible_asset_ids)
     if clip_code:

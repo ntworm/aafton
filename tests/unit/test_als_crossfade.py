@@ -4,17 +4,13 @@ O defeito coberto aqui: o .als era escrito com os dois clips sobrepostos, e o
 Live recorta o clip que sai no ponto da juncao e descarta o fade out dele. No
 arquivo real medido o clip que saia perdia 24000 samples a cada Save As.
 
-O conserto tem duas metades. O escritor escreve a forma nativa do Live (os
-dois clips encostados, CrossfadeInState=1 no clip que entra, FadeInLength=0) e
-o leitor refaz a sobreposicao que o AAF tem, mas so quando o XML traz todas as
-provas: o estado de crossfade, o fade in zerado, o fade out vivo do vizinho, a
-juncao encostada e o excesso de material da fonte.
-
-O esquema e um candidato offline, derivado do template do Live: foi escrito e
-lido de volta aqui, mas ninguem abriu o .als gerado no Live, entao nao esta
-homologado. O manual do Live (6.8) prova a adjacencia dos clips e os limites
-de loop; ele nao prova o algoritmo do XML, o OutMarker, a direcao do crossfade
-nem a unidade do tempo.
+O conserto tem duas metades. O escritor escreve a forma nativa medida no Live
+em 15/11/2026: os dois clips encostados no fim do clip que sai no AAF,
+CrossfadeInState=1 e FadeInLength=0 no clip que entra, com o LoopStart dele
+avancado o comprimento do crossfade. O leitor refaz a sobreposicao que o AAF
+tem: num set de sidecar versao 3 pelo modelo medido (o clip que entra volta L
+antes da juncao); num set de versao 2 pela leitura antiga, que exige tambem o
+excesso de material entre OutMarker e LoopStart.
 
 Cada teste aqui falha no codigo anterior: o escritor nao encostava os clips e o
 leitor nao estendia a geometria. As guardas do que nao pode passar estao em
@@ -168,8 +164,8 @@ def _sessao_da_cadeia(wav: Path) -> SessionIR:
 def _sessao_legada(wav: Path) -> SessionIR:
     """O modo legado: os clips ja encostados e o que entra traz a flag.
 
-    Aqui nao ha material sobrando no clip que sai, entao nao ha crossfade a
-    provar: a geometria tem de ficar como estava.
+    Na versao 2 nao ha material sobrando no clip que sai, entao nao ha
+    crossfade a provar. Na versao 3 o par e o crossfade que o Live toca.
     """
     clip_a = _clip(
         0,
@@ -216,6 +212,36 @@ def _set(clip, caminho: str, valor: str) -> None:
     clip.find(caminho).set("Value", valor)
 
 
+def _versao_do_sidecar(caminho: Path, versao: int) -> None:
+    """Regrava o sidecar do .als com a format_version pedida."""
+    sidecar = sidecar_path_for(caminho)
+    dados = json.loads(sidecar.read_text(encoding="utf-8"))
+    dados["format_version"] = versao
+    sidecar.write_text(json.dumps(dados), encoding="utf-8")
+
+
+def _forma_v2(caminho: Path) -> None:
+    """Passa o par de ``_sessao_do_par`` (60 BPM) para a forma do escritor antigo.
+
+    E o que o aafton gravava antes da forma medida, com sidecar de versao 2: A
+    termina no inicio de B no AAF (1,5 beat), B comeca ali com o LoopStart do
+    offset do AAF, e o OutMarker de A e o fim do trecho logico dele (2 beats).
+    """
+
+    def mudanca(root):
+        clip_a, clip_b = root.findall(
+            ".//AudioTrack/DeviceChain/MainSequencer/Sample/ArrangerAutomation/Events/AudioClip"
+        )
+        _set(clip_a, "CurrentEnd", "1.5")
+        _set(clip_a, "Loop/OutMarker", "2")
+        _set(clip_b, "CurrentStart", "1.5")
+        clip_b.set("Time", "1.5")
+        _set(clip_b, "Loop/LoopStart", "1")
+
+    _editar(caminho, mudanca)
+    _versao_do_sidecar(caminho, 2)
+
+
 # --- O escritor: a forma nativa do Live -------------------------------------
 
 
@@ -231,18 +257,22 @@ def test_escritor_encosta_o_par_e_declara_o_crossfade(tmp_path):
 
     clip_a, clip_b = _clips_do_als(destino)
 
-    # A juncao e o mesmo ponto da grade, no mesmo texto.
+    # A juncao e o fim de A no AAF (2 beats), no mesmo texto nos dois clips.
+    assert float(get_value(clip_a, "CurrentEnd")) == 2.0
     assert get_value(clip_a, "CurrentEnd") == get_value(clip_b, "CurrentStart")
     # O atributo Time do clip e o que posiciona ele no arranjo.
     assert clip_a.get("Time") == get_value(clip_a, "CurrentStart")
+    assert clip_b.get("Time") == get_value(clip_b, "CurrentStart")
 
     # O fade out inteiro fica no clip que sai; o que entra entra por estado.
     assert float(get_value(clip_a, "Fades/FadeOutLength")) == pytest.approx(0.5)
     assert get_value(clip_b, "Fades/CrossfadeInState") == "1"
     assert float(get_value(clip_b, "Fades/FadeInLength")) == 0.0
+    # O que entra comeca L adiante na fonte: offset 1 s mais 0,5 s.
+    assert float(get_value(clip_b, "Loop/LoopStart")) == 1.5
 
-    # O material da fonte do clip que sai continua com a duracao logica.
-    assert float(get_value(clip_a, "Loop/OutMarker")) == pytest.approx(2.0)
+    # OutMarker e o fim do arquivo (4 s) em beats; HiddenLoopEnd o fim do trecho.
+    assert float(get_value(clip_a, "Loop/OutMarker")) == pytest.approx(4.0)
     assert float(get_value(clip_a, "Loop/HiddenLoopEnd")) == pytest.approx(2.0)
 
 
@@ -413,7 +443,8 @@ def test_sem_estado_de_crossfade_a_geometria_fica_recortada(tmp_path):
     lido = read_session(destino, Report())
     clip_a, clip_b = lido.tracks[0].clips
 
-    assert clip_a.timeline_end_samples == ORIGEM + DURACAO - CROSSFADE
+    assert clip_a.timeline_end_samples == ORIGEM + DURACAO
+    assert clip_b.timeline_start_samples == ORIGEM + DURACAO
     assert clip_b.fade_in is None
 
 
@@ -433,14 +464,59 @@ def test_sem_fade_out_vivo_nada_e_estendido(tmp_path):
     lido = read_session(destino, Report())
     clip_a, clip_b = lido.tracks[0].clips
 
-    assert clip_a.timeline_end_samples == ORIGEM + DURACAO - CROSSFADE
+    assert clip_a.timeline_end_samples == ORIGEM + DURACAO
+    assert clip_b.timeline_start_samples == ORIGEM + DURACAO
+    assert clip_b.fade_in is None
+
+
+# --- Os sets de format_version 2 leem como antes ----------------------------
+
+
+def test_set_da_versao_2_volta_a_mesma_geometria(tmp_path):
+    """Um set gravado na forma antiga, com sidecar de versao 2, le como antes."""
+    wav = _wav_pcm(tmp_path / "fonte.wav", SR, SR * 4)
+    destino = _escrever(tmp_path, _sessao_do_par(wav))
+    _forma_v2(destino)
+
+    lido = read_session(destino, Report())
+    clip_a, clip_b = lido.tracks[0].clips
+
+    assert (clip_a.timeline_start_samples, clip_a.timeline_end_samples) == (
+        ORIGEM,
+        ORIGEM + DURACAO,
+    )
+    assert (clip_b.timeline_start_samples, clip_b.timeline_end_samples) == (
+        ORIGEM + DURACAO - CROSSFADE,
+        ORIGEM + DURACAO - CROSSFADE + DURACAO,
+    )
+    assert (clip_a.source_offset_samples, clip_b.source_offset_samples) == (0, OFFSET_B)
+    assert clip_a.fade_out is not None and clip_a.fade_out.duration_samples == CROSSFADE
+    assert clip_b.fade_in is not None and clip_b.fade_in.duration_samples == CROSSFADE
+
+
+def test_set_da_versao_2_nao_usa_o_modelo_medido(tmp_path):
+    """O mesmo XML da forma nova com sidecar de versao 2 nao monta o par medido.
+
+    Na versao 2 so o excesso entre OutMarker e LoopStart prova o crossfade, e
+    o OutMarker da forma nova e o fim do arquivo: o par fica como esta.
+    """
+    wav = _wav_pcm(tmp_path / "fonte.wav", SR, SR * 4)
+    destino = _escrever(tmp_path, _sessao_do_par(wav))
+    _versao_do_sidecar(destino, 2)
+
+    lido = read_session(destino, Report())
+    clip_a, clip_b = lido.tracks[0].clips
+
+    assert clip_a.timeline_end_samples == ORIGEM + DURACAO
+    assert clip_b.timeline_start_samples == ORIGEM + DURACAO
     assert clip_b.fade_in is None
 
 
 def test_out_marker_sem_excesso_nao_extende(tmp_path):
-    """O material que sobra e a prova: sem ele o fade de render fica como era."""
+    """O material que sobra e a prova da versao 2: sem ele o fade fica como era."""
     wav = _wav_pcm(tmp_path / "fonte.wav", SR, SR * 4)
     destino = _escrever(tmp_path, _sessao_do_par(wav))
+    _forma_v2(destino)
 
     def sem_excesso(root):
         clip_a = root.findall(
@@ -459,10 +535,31 @@ def test_out_marker_sem_excesso_nao_extende(tmp_path):
     assert clip_b.fade_in is None
 
 
-def test_fade_de_render_legado_com_flag_1_fica_como_era(tmp_path):
-    """O modo legado, encostado e com a flag, continua com a geometria antiga."""
+def test_par_encostado_com_flag_1_le_pelo_modelo_medido(tmp_path):
+    """Encostado e com a flag, o par e o crossfade que o Live toca.
+
+    O Live toca o crossfade antes da juncao, com o material de B antes do
+    LoopStart (1 s aqui): B volta L antes, com offset 1 s - L e fade in L.
+    """
     wav = _wav_pcm(tmp_path / "fonte.wav", SR, SR * 4)
     destino = _escrever(tmp_path, _sessao_legada(wav))
+
+    lido = read_session(destino, Report())
+    clip_a, clip_b = lido.tracks[0].clips
+
+    assert clip_a.timeline_end_samples == ORIGEM + DURACAO
+    assert clip_a.fade_out is not None and clip_a.fade_out.duration_samples == CROSSFADE
+    assert clip_b.timeline_start_samples == ORIGEM + DURACAO - CROSSFADE
+    assert clip_b.timeline_end_samples == ORIGEM + DURACAO + DURACAO
+    assert clip_b.source_offset_samples == OFFSET_B - CROSSFADE
+    assert clip_b.fade_in is not None and clip_b.fade_in.duration_samples == CROSSFADE
+
+
+def test_fade_de_render_legado_com_flag_1_fica_como_era_na_versao_2(tmp_path):
+    """Na versao 2 o modo legado, encostado e com a flag, fica como era."""
+    wav = _wav_pcm(tmp_path / "fonte.wav", SR, SR * 4)
+    destino = _escrever(tmp_path, _sessao_legada(wav))
+    _versao_do_sidecar(destino, 2)
 
     lido = read_session(destino, Report())
     clip_a, clip_b = lido.tracks[0].clips
@@ -471,3 +568,22 @@ def test_fade_de_render_legado_com_flag_1_fica_como_era(tmp_path):
     assert clip_b.timeline_start_samples == ORIGEM + DURACAO
     assert clip_b.fade_in is None
     assert clip_b.crossfade_in_state is True
+
+
+def test_crossfade_nao_provado_leva_track_e_track_id_no_erro(tmp_path):
+    """Sem sidecar, o erro de crossfade nao provado identifica track e track_id."""
+    from aafton.als_ancora import start_padrao
+    from tests.unit.test_als_sem_sidecar import clip, escrever_wav, montar_set
+
+    wav = escrever_wav(tmp_path, "dx.wav")
+    a = clip(wav, 0.0, 4.0, nome="a", warp=[(0.0, 0.0), (4.0, 4.0)], fade_out=1.0)
+    b = clip(wav, 4.0, 8.0, nome="b", crossfade=True, loop_start=2.0)
+    als = montar_set(tmp_path, [("LIMPA", [clip(wav, 0.0, 4.0)]), ("XF", [a, b])], bpm=60.0)
+    report = Report(strict=False)
+
+    read_session(als, report, start=start_padrao())
+
+    erros = [i for i in report.issues if i.code == "ALS_CROSSFADE_NOT_PROVEN"]
+    assert len(erros) == 1
+    assert erros[0].context["track"] == "XF"
+    assert erros[0].context["track_id"] == "t1"

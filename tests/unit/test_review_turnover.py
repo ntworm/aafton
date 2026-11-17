@@ -57,7 +57,7 @@ def test_failed_turnover_leaves_no_published_directory(tmp_path):
     source.write_bytes(b"invalid")
     destination = tmp_path / "package"
     with pytest.raises(TurnoverError):
-        create_turnover_package(source, media_dir=tmp_path / "missing", output_dir=destination)
+        create_turnover_package(source, output_dir=destination)
     assert not destination.exists()
 
 

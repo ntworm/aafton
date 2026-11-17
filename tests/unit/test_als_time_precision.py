@@ -126,9 +126,11 @@ def test_clip_cai_na_amostra_exata(contexto, bpm, start, duration, offset):
     _na_posicao_clip(node.get("Time"), start, bpm)
     _na_posicao_clip(get_value(node, AUDIO_CLIP_FIELDS["current_start"]), start, bpm)
     _na_posicao_clip(get_value(node, AUDIO_CLIP_FIELDS["current_end"]), start + duration, bpm)
-    _na_fonte(get_value(node, AUDIO_CLIP_FIELDS["loop_start"]), offset, bpm)
-    _na_fonte(get_value(node, AUDIO_CLIP_FIELDS["loop_end"]), offset + duration, bpm)
-    _na_fonte(get_value(node, AUDIO_CLIP_FIELDS["out_marker"]), offset + duration, bpm)
+    # Os marcadores de loop sao segundos do arquivo (o beat a 60 BPM) em qualquer
+    # tempo; o OutMarker e o fim do arquivo (3 s) em beats do tempo do set.
+    _na_fonte(get_value(node, AUDIO_CLIP_FIELDS["loop_start"]), offset, 60.0)
+    _na_fonte(get_value(node, AUDIO_CLIP_FIELDS["loop_end"]), offset + duration, 60.0)
+    _na_fonte(get_value(node, AUDIO_CLIP_FIELDS["out_marker"]), 3 * SR, bpm)
     _na_timeline(get_value(node, AUDIO_CLIP_FIELDS["fade_in_length"]), 4801, bpm)
     _na_timeline(get_value(node, AUDIO_CLIP_FIELDS["fade_out_length"]), 4799, bpm)
 
@@ -197,7 +199,7 @@ def test_set_inteiro_volta_sample_exato_com_marcador_e_envelope(tmp_path, bpm):
     for node, (start, end, offset) in zip(audio_clips, [(48007, 60007, 0), (96013, 120013, 48211)]):
         _na_posicao_clip(node.find("CurrentStart").get("Value"), start, bpm)
         _na_posicao_clip(node.find("CurrentEnd").get("Value"), end, bpm)
-        _na_fonte(node.find("Loop/LoopStart").get("Value"), offset, bpm)
+        _na_fonte(node.find("Loop/LoopStart").get("Value"), offset, 60.0)
     eventos = [
         e
         for e in root.findall(".//LiveSet/Tracks/AudioTrack//FloatEvent")

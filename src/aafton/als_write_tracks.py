@@ -18,9 +18,9 @@ from .als_write_base import (
     attach_to_group,
     detach_from_group,
 )
-from .als_write_clips import build_audio_clip, build_gain_envelope
+from .als_write_clips import build_audio_clip, build_gain_envelope, mark_production_clip
 from .als_xml import IdAllocator, clone, format_value, renumber_siblings, set_value
-from .ir import SessionIR
+from .ir import EXPANDED_MARK, SessionIR
 from .media_extract import read_audio_metadata
 from .report import Report
 
@@ -48,8 +48,12 @@ class WriteContext:
     track_bindings: list[dict]
     audio_track_idx: int
     clip_ranges: list[dict]
+    clip_origins: list[dict] = field(default_factory=list)
     total_soltas: int = 0
     metadata_cache: dict = field(default_factory=dict)
+    # Pasta do .als que esta sendo escrito: a midia que esta dentro dela
+    # ganha o caminho relativo, como o Live grava depois do Save As.
+    als_dir: Path | None = None
 
 
 def track_binding(ctx: WriteContext, idx: int, tr, node: ET.Element) -> dict:
@@ -129,6 +133,13 @@ def _add_binding_extras(binding: dict, tr) -> None:
         binding["generated"] = tr.raw["generated"]
 
 
+def _juntar_chaves_de_origem(mantido, descartado) -> None:
+    """O clip que fica leva as chaves de origem da projecao do outro canal."""
+    if "origin_keys" in mantido.raw and "origin_keys" in descartado.raw:
+        novas = [k for k in descartado.raw["origin_keys"] if k not in mantido.raw["origin_keys"]]
+        mantido.raw["origin_keys"] = [*mantido.raw["origin_keys"], *novas]
+
+
 def clips_for_live_track(session: SessionIR, t_ir) -> list:
     """Colapsa as duas projecoes de um mesmo clip estereo em um clip do Live.
 
@@ -160,11 +171,12 @@ def clips_for_live_track(session: SessionIR, t_ir) -> list:
             clip.fade_in.duration_samples if clip.fade_in is not None else None,
             clip.fade_out.duration_samples if clip.fade_out is not None else None,
         )
-        first_channel = first_channel_by_projection.get(projection)
-        if first_channel is not None and first_channel != clip.channel_index:
+        mantido = first_channel_by_projection.get(projection)
+        if mantido is not None and mantido.channel_index != clip.channel_index:
+            _juntar_chaves_de_origem(mantido, clip)
             continue
 
-        first_channel_by_projection.setdefault(projection, clip.channel_index)
+        first_channel_by_projection.setdefault(projection, clip)
         result.append(clip)
 
     return result
@@ -175,10 +187,20 @@ def build_one_audio_track(ctx: WriteContext, t_ir, pr_id) -> ET.Element:
     n = clone(ctx.track_prototype, ctx.allocator, ctx.posicionais, ctx.unicos)
     n.set("Id", str(pr_id))
     _set_track_names(n, t_ir)
+    _set_node_color(n, getattr(t_ir, "color_index", None))
     _apply_mixer(ctx, n, t_ir)
     _write_track_clips(ctx, n, t_ir)
     _attach_gain_envelope(ctx, n, t_ir)
     return n
+
+
+def _set_node_color(node: ET.Element, color_index: int | None) -> None:
+    """Grava o indice de cor da paleta do Live quando preenchido."""
+    if color_index is None:
+        return
+    cor = node.find("Color")
+    if cor is not None:
+        cor.set("Value", str(color_index))
 
 
 def _set_track_names(n: ET.Element, t_ir) -> None:
@@ -244,7 +266,9 @@ def _write_track_clips(ctx: WriteContext, n: ET.Element, t_ir) -> None:
                     ctx.options,
                     ctx.report,
                     is_video=t_ir.is_video,
+                    als_dir=ctx.als_dir,
                 )
+                mark_production_clip(xml_clip, clip)
                 eventos.append(xml_clip)
                 escritos.add((clip.timeline_start_samples, clip.timeline_end_samples))
                 pares.append((clip, xml_clip))
@@ -263,7 +287,18 @@ def _write_track_clips(ctx: WriteContext, n: ET.Element, t_ir) -> None:
             material=lambda clip: _material_do_clip(ctx, clip),
         )
         renumber_siblings(eventos, "AudioClip")
+        origens = [
+            [
+                clip.timeline_start_samples,
+                clip.timeline_end_samples,
+                [[int(p[0]), int(p[1])] for p in (clip.raw.get("origin_keys") or ())],
+            ]
+            for clip, _ in pares
+        ]
+    else:
+        origens = []
     ctx.clip_ranges.append({"track": t_ir.name, "ranges": [list(r) for r in sorted(escritos)]})
+    ctx.clip_origins.append({"track": t_ir.name, "clips": origens})
 
 
 def _material_do_clip(ctx: WriteContext, clip) -> tuple[int, int] | None:
@@ -374,7 +409,8 @@ def _emit_multichannel_group(ctx: WriteContext, track) -> None:
 def _emit_prefix_group(ctx: WriteContext, prefix: str) -> None:
     """Emite o grupo do prefixo e todas as tracks que pertencem a ele."""
     if prefix not in ctx.created_groups:
-        ctx.created_groups[prefix] = _new_group_node(ctx, prefix)
+        group_color = _group_color_for(ctx, prefix)
+        ctx.created_groups[prefix] = _new_group_node(ctx, prefix, color_index=group_color)
     for t_member in ctx.session.tracks:
         if id(t_member) in ctx.emitted_tracks:
             continue
@@ -384,6 +420,16 @@ def _emit_prefix_group(ctx: WriteContext, prefix: str) -> None:
         ctx.next_track_id += 1
         attach_to_group(node, ctx.created_groups[prefix])
         _register_emitted_track(ctx, t_member, node)
+
+
+def _group_color_for(ctx: WriteContext, group_name: str) -> int | None:
+    """Procura a cor de organizacao declarada nas tracks membros do grupo."""
+    for trk in ctx.session.tracks:
+        if ctx.track_to_group.get(id(trk)) == group_name:
+            color = getattr(trk, "organize_group_color", None)
+            if color is not None:
+                return color
+    return None
 
 
 def _emit_ungrouped_track(ctx: WriteContext, track) -> None:
@@ -398,7 +444,7 @@ def _emit_ungrouped_track(ctx: WriteContext, track) -> None:
     _register_emitted_track(ctx, track, node)
 
 
-def _new_group_node(ctx: WriteContext, name: str) -> int:
+def _new_group_node(ctx: WriteContext, name: str, *, color_index: int | None = None) -> int:
     """Cria um GroupTrack novo e devolve o id reservado para ele."""
     group_node = clone(ctx.group_prototype, ctx.allocator, ctx.posicionais, ctx.unicos)
     group_id = ctx.next_track_id
@@ -410,6 +456,7 @@ def _new_group_node(ctx: WriteContext, name: str) -> int:
             a = b_nome.find(c)
             if a is not None:
                 a.set("Value", name)
+    _set_node_color(group_node, color_index)
     try:
         set_value(group_node, "TrackGroupId", -1)
     except KeyError:
@@ -423,7 +470,9 @@ def _register_emitted_track(ctx: WriteContext, tr, node: ET.Element) -> None:
     """Registra a track emitida nas listas do Live e do sidecar."""
     ctx.novas_tracks.append(node)
     ctx.emitted_tracks.add(id(tr))
-    if not getattr(tr, "raw", {}).get("generated"):
+    raw = getattr(tr, "raw", {})
+    # Track gerada e irma da expansao nao tem slot no AAF de origem.
+    if not raw.get("generated") and raw.get("expanded") != EXPANDED_MARK:
         ctx.audio_source_indices.append(tr.original_source_indices)
     ctx.track_bindings.append(track_binding(ctx, ctx.audio_track_idx, tr, node))
     ctx.audio_track_idx += 1

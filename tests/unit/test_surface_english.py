@@ -87,6 +87,8 @@ EXCEPTIONS: dict[str, str] = {
     "live_compat_proveniencia.py: saida": _PRIVADO,
     "live_compat_proveniencia.py: casos": _PRIVADO,
     "live_compat_proveniencia.py: caminho": _PRIVADO,
+    "locators_csv.py: entrada": "cabecalho de coluna de um CSV em portugues, comparado com o arquivo",
+    "locators_csv.py: saida": "cabecalho de coluna de um CSV em portugues, comparado com o arquivo",
     "live_compat_proveniencia.py: the report read (key relatorio) is not the validated path": (
         "a mensagem cita a chave do manifesto privado, que o operador le no arquivo"
     ),

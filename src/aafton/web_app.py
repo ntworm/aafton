@@ -433,6 +433,16 @@ class StudioRequestHandler(BaseHTTPRequestHandler):
 
     def _handle_turnover(self, payload: dict) -> None:
         """Gera o pacote de turnover da sessao informada."""
+        if payload.get("media_dir"):
+            self._send_json(
+                {
+                    "ok": False,
+                    "error": "media_dir is no longer supported; media is discovered from session references",
+                },
+                status=400,
+            )
+            return
+
         session = payload.get("session", "").strip()
         if not session or not Path(session).is_file():
             self._send_json({"ok": False, "error": f"Session not found: {session}"}, status=400)
@@ -441,7 +451,6 @@ class StudioRequestHandler(BaseHTTPRequestHandler):
         try:
             res = create_turnover_package(
                 session_file=session,
-                media_dir=payload.get("media_dir"),
                 output_dir=payload.get("output"),
                 session_name=payload.get("name"),
                 strict=not payload.get("permissive", False),

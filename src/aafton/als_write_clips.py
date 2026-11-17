@@ -2,6 +2,8 @@
 
 import xml.etree.ElementTree as ET
 
+from fractions import Fraction
+from pathlib import Path
 
 from .als_paths import AUDIO_CLIP_FIELDS
 
@@ -11,6 +13,8 @@ from .als_xml import (
     format_value,
     set_value,
 )
+
+from .als_write_caminho import aplicar_caminho_relativo
 
 from .ir import ClipIR, MediaAsset
 
@@ -28,6 +32,7 @@ from .als_write_base import (
     _clip_times,
     clear_warp,
     samples_to_beats,
+    source_seconds,
     to_beats,
 )
 
@@ -56,7 +61,47 @@ def sanitize_sample_ref(node: ET.Element, asset: MediaAsset) -> None:
         return
 
     _clear_sample_ref_files(ref, asset)
+    _clear_source_context(ref)
+    _set_file_identity(ref, asset)
     _set_sample_ref_defaults(ref, asset)
+
+
+def _clear_source_context(ref: ET.Element) -> None:
+    """Esvazia o SourceContext herdado do template.
+
+    O template guarda ali a origem do sample no browser do Live
+    (``BrowserContentPath view:X-Samples#FileId_...``) e uma copia do FileRef
+    antigo. Nada disso descreve a midia da conversao.
+    """
+    for contexto in ref.findall("SourceContext"):
+        for filho in list(contexto):
+            contexto.remove(filho)
+
+
+def _set_file_identity(ref: ET.Element, asset: MediaAsset) -> None:
+    """Grava a data e o tamanho do arquivo real no SampleRef.
+
+    O Live compara ``LastModDate`` com a data do arquivo; quando difere, confere
+    ``OriginalCrc``, e o 0 nao bate, entao o clip abre como "Sample Offline".
+    Medido no Live 12 em 15/11/2026: com a data e o tamanho do arquivo o clip
+    abre online. Sem arquivo no disco, a data fica 0 e o tamanho 0.
+    """
+    data, tamanho = 0, 0
+    if asset.resolved_path:
+        try:
+            estado = Path(asset.resolved_path).stat()
+        except OSError:
+            pass
+        else:
+            data, tamanho = int(estado.st_mtime), estado.st_size
+    alvo = ref.find("LastModDate")
+    if alvo is not None:
+        alvo.set("Value", format_value(data))
+    file_ref = ref.find("FileRef")
+    if file_ref is not None:
+        alvo = file_ref.find("OriginalFileSize")
+        if alvo is not None:
+            alvo.set("Value", format_value(tamanho))
 
 
 def _clear_sample_ref_files(ref: ET.Element, asset: MediaAsset) -> None:
@@ -130,17 +175,38 @@ def _set_clip_times(
     set_value(node, AUDIO_CLIP_FIELDS["current_end"], end_beats)
 
 
-def _loop_values(clip: ClipIR, options: WriteOptions, is_video: bool) -> tuple[float, float]:
+def _loop_values(clip: ClipIR, options: WriteOptions) -> tuple[float, float]:
+    """LoopStart e LoopEnd em segundos do arquivo, no audio sem warp e no video."""
     offset = clip.source_offset_samples or 0
     source_end = offset + clip.duration_samples
-    if is_video:
-        # Video sempre em segundos, que e o beat a 60 BPM.
-        loop_start_val = samples_to_beats(offset, options.sample_rate, 60.0, SOURCE)
-        loop_end_val = samples_to_beats(source_end, options.sample_rate, 60.0, SOURCE)
-    else:
-        loop_start_val = _duration_beats(offset, options, SOURCE)
-        loop_end_val = _duration_beats(source_end, options, SOURCE)
-    return loop_start_val, loop_end_val
+    return (
+        source_seconds(offset, options.sample_rate),
+        source_seconds(source_end, options.sample_rate),
+    )
+
+
+def _source_end_beats(samples: int, sample_rate: int, bpm: float) -> float:
+    """Fim da fonte em beats do tempo do set, do lado da fonte."""
+    try:
+        return samples_to_beats(samples, sample_rate, bpm, SOURCE)
+    except ValueError:
+        return float(Fraction(samples) * Fraction(bpm) / (60 * sample_rate))
+
+
+def _out_marker(clip: ClipIR, asset: MediaAsset, options: WriteOptions) -> float:
+    """OutMarker do clip de audio: o fim da fonte em beats (segundos x tempo / 60).
+
+    Medido no Live: 32 beats para um arquivo de 20 s a 96 BPM. O fim e o do
+    arquivo quando a duracao e a taxa dele sao conhecidas, e nunca antes do fim
+    do trecho que o clip usa.
+    """
+    offset = clip.source_offset_samples or 0
+    usado = (offset + clip.duration_samples, options.sample_rate)
+    candidatos = [usado]
+    if asset.duration_samples and asset.sample_rate:
+        candidatos.append((asset.duration_samples, asset.sample_rate))
+    samples, taxa = max(candidatos, key=lambda par: Fraction(par[0], par[1]))
+    return _source_end_beats(samples, taxa, options.bpm)
 
 
 def _set_clip_core_values(
@@ -148,11 +214,12 @@ def _set_clip_core_values(
     clip: ClipIR,
     loop_start_val: float,
     loop_end_val: float,
+    out_marker_val: float,
     resolved: str,
 ) -> None:
     set_value(node, AUDIO_CLIP_FIELDS["loop_start"], loop_start_val)
     set_value(node, AUDIO_CLIP_FIELDS["loop_end"], loop_end_val)
-    set_value(node, AUDIO_CLIP_FIELDS["out_marker"], loop_end_val)
+    set_value(node, AUDIO_CLIP_FIELDS["out_marker"], out_marker_val)
     set_value(node, AUDIO_CLIP_FIELDS["loop_on"], False)
     set_value(node, AUDIO_CLIP_FIELDS["start_relative"], 0.0)
     set_value(node, AUDIO_CLIP_FIELDS["is_warped"], False)
@@ -253,14 +320,17 @@ def build_audio_clip(
     options: WriteOptions,
     report: Report,
     is_video: bool = False,
+    als_dir: Path | None = None,
 ) -> ET.Element:
     resolved = _resolve_clip_path(clip, asset, options)
 
     node = clone(prototype, allocator, posicionais, unicos)
     _set_clip_times(node, clip, options, is_video)
 
-    loop_start_val, loop_end_val = _loop_values(clip, options, is_video)
-    _set_clip_core_values(node, clip, loop_start_val, loop_end_val, resolved)
+    loop_start_val, loop_end_val = _loop_values(clip, options)
+    # O video fica como era: OutMarker no fim do trecho, em segundos.
+    out_marker_val = loop_end_val if is_video else _out_marker(clip, asset, options)
+    _set_clip_core_values(node, clip, loop_start_val, loop_end_val, out_marker_val, resolved)
 
     if is_video:
         _set_video_warp_fields(node)
@@ -271,8 +341,48 @@ def build_audio_clip(
     _set_hidden_loop_fields(node, loop_end_val)
 
     sanitize_sample_ref(node, asset)
+    # O caminho relativo vem depois do sanitize: ele escreve o caminho
+    # absoluto nos dois campos do FileRef, e o relativo sobrescreve o
+    # RelativePath quando a midia esta dentro da pasta do set.
+    aplicar_caminho_relativo(node, asset.resolved_path or "", als_dir)
     clear_warp(node)
+    _set_clip_color(node, clip)
     return node
+
+
+def _set_clip_color(node: ET.Element, clip: ClipIR) -> None:
+    """Grava a cor de organizacao do clip quando preenchida."""
+    if clip.color_index is None:
+        return
+    cor = node.find("Color")
+    if cor is not None:
+        cor.set("Value", str(clip.color_index))
+
+
+# Cor de clip do Live para take circled no som direto: indice da paleta do Live,
+# o verde, como no mock aprovado por Gabriel em 14/11/2026 (o ambar fica para a acao).
+CIRCLED_CLIP_COLOR = 5
+# Take nao circled: cinza medio da paleta (7B7B7B). A cor padrao do template e um
+# verde-menta (6) que nao se distingue do verde do circled; medido no Live em 14/11.
+TAKE_CLIP_COLOR = 55
+
+
+def mark_production_clip(node: ET.Element, clip: ClipIR) -> None:
+    """Texto do clip (cena, take, tape, circled, nota) e cor do take circled.
+
+    So age no clip do som direto, que traz ``raw["production"]``; o clip de
+    AAF, EDL ou XML fica como esta.
+    """
+    producao = clip.raw.get("production")
+    if not producao:
+        return
+    anotacao = node.find("Annotation")
+    if anotacao is not None:
+        anotacao.set("Value", producao.get("annotation") or "")
+    cor = node.find("Color")
+    if cor is not None:
+        circled = producao.get("circled")
+        cor.set("Value", str(CIRCLED_CLIP_COLOR if circled else TAKE_CLIP_COLOR))
 
 
 def _clamped_gain_val(val: float, abs_s: int, track_name: str, report: Report) -> float:

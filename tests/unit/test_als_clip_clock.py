@@ -80,7 +80,8 @@ def _assert_playback(node, start, duration, bpm, sr):
         assert math.ceil(samples) == expected
         assert round(samples) == expected
     assert round((saved_end - saved_start) * 60.0 / bpm * sr) == duration
-    assert round(float(node.find("Loop/LoopStart").get("Value")) * 60.0 / bpm * sr) == 617
+    # LoopStart de clip sem warp e segundo do arquivo, em qualquer tempo.
+    assert round(float(node.find("Loop/LoopStart").get("Value")) * sr) == 617
 
 
 @pytest.mark.parametrize("bpm", (60.0, 97.0, 120.0))

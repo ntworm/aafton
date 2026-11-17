@@ -1,8 +1,8 @@
-"""Clip que fica fora do AAF em uma track stereo.
+"""Crossfade com automacao dentro do overlap numa track stereo.
 
-O clip que conflita com a automacao segmentada fica fora do AAF, e com ele a
-outra metade do par stereo: o aviso WRITE_FADE_UNSUPPORTED nao pode nomear
-uma metade que nao entrou no arquivo.
+O par stereo inteiro entra no AAF com a Transition: a automacao dentro do
+overlap nao deixa nenhuma metade fora (antes de 16/11/2026 o clip seguinte e o
+par dele saiam com WRITE_CLIP_SKIPPED).
 """
 
 from __future__ import annotations
@@ -53,23 +53,19 @@ def _escrever(tmp_path):
     return relatorio, destino
 
 
-def test_a_metade_do_par_pulado_nao_vira_aviso_de_fade(tmp_path):
-    """O clip pulado e o par inteiro: nenhum dos dois vira aviso de fade."""
-    relatorio, destino = _escrever(tmp_path)
+def test_nenhuma_metade_do_par_fica_fora_nem_vira_aviso_de_fade(tmp_path):
+    """Os dois clips do par entram: nenhum pulo e nenhum erro de fade."""
+    relatorio, _ = _escrever(tmp_path)
 
-    pulados = [i for i in relatorio.issues if i.code == "WRITE_CLIP_SKIPPED"]
-    assert len(pulados) == 1
-    assert pulados[0].context["clip"] == "a2.wav"
-
-    fades = [i for i in relatorio.issues if i.code == "WRITE_FADE_UNSUPPORTED"]
-    assert "a2.wav" not in [i.context["clip"] for i in fades]
+    codigos = [i.code for i in relatorio.issues]
+    assert "WRITE_CLIP_SKIPPED" not in codigos
+    assert "WRITE_FADE_UNSUPPORTED" not in codigos
 
 
-def test_o_arquivo_do_aaf_tem_o_clip_que_ficou(tmp_path):
-    """O AAF escrito tem o clip que ficou, com o envelope do fade dele."""
+def test_o_arquivo_do_aaf_tem_os_dois_clips_e_a_transition(tmp_path):
+    """O slot stereo tem os dois clips e a Transition entre eles."""
     _, destino = _escrever(tmp_path)
 
     dados = _slots_de_audio(destino)[0][1]
-    assert dados["tipos"] == ["OperationGroup"]
-    assert dados["transicoes"] == 0
-    assert dados["envelopes"] == 1
+    assert dados["tipos"].count("OperationGroup") == 2
+    assert dados["transicoes"] == 1

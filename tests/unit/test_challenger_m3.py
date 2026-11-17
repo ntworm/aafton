@@ -394,10 +394,15 @@ def test_real_fixture_absolute_paths(tmp_path, pt_aaf, audio_dir):
 
 
 @pytest.mark.parametrize("stereo_mode", ["split", "pair"])
-def test_real_fixture_export_reports_loss_and_preserves_structure(
+def test_real_fixture_export_strict_passes_and_preserves_structure(
     tmp_path, stereo_mode, pt_aaf, audio_dir
 ):
-    """Perda de automação reprova export estrito; permissivo mantém prova estrutural."""
+    """O export estrito do fixture real passa e mantém a prova estrutural.
+
+    Até 16/11/2026 o estrito parava no crossfade com automação dentro do overlap
+    e no fade com automação dentro; hoje o crossfade vira Transition e o fade vira
+    envelope com o aviso WRITE_FADE_AS_ENVELOPE.
+    """
 
     als1 = tmp_path / f"pass1_{stereo_mode}.als"
     cmd_import = [
@@ -440,19 +445,9 @@ def test_real_fixture_export_reports_loss_and_preserves_structure(
     res = subprocess.run(
         cmd_export, capture_output=True, text=True, cwd=str(Path(__file__).parents[2])
     )
-    assert res.returncode == 1
-    # A recusa continua existindo; o que mudou e qual camada a nomeia. A automacao
-    # do Live passou a ser exportada em trechos, entao neste fixture o que barra o
-    # export estrito e o fade independente.
-    assert any(
-        code in res.stderr
-        for code in (
-            "WRITE_SESSION_FEATURE_UNSUPPORTED",
-            "WRITE_FADE_UNSUPPORTED",
-            "WRITE_GAIN_AUTOMATION_UNSUPPORTED",
-        )
-    )
-    assert not aaf_out.exists()
+    assert res.returncode == 0, res.stderr
+    assert aaf_out.exists()
+    aaf_out.unlink()
     export_report = tmp_path / "export.json"
     res = subprocess.run(
         cmd_export + ["--permissive", "--report", str(export_report)],
@@ -460,9 +455,12 @@ def test_real_fixture_export_reports_loss_and_preserves_structure(
         text=True,
         cwd=str(Path(__file__).parents[2]),
     )
-    assert res.returncode == 1, f"Export should report unsupported features: {res.stderr}"
+    assert res.returncode == 0, res.stderr
     evidence = json.loads(export_report.read_text(encoding="utf-8"))
-    assert evidence["incomplete"]
+    assert not evidence["incomplete"]
+    codigos = [issue["code"] for issue in evidence["issues"]]
+    assert "WRITE_CLIP_SKIPPED" not in codigos
+    assert "WRITE_FADE_AS_ENVELOPE" in codigos
 
     import aaf2
 

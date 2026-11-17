@@ -19,35 +19,6 @@ def _is_supported_transition(previous_clip, clip, overlap: int) -> bool:
     )
 
 
-def _transition_conflicts_with_automation(
-    previous_clip, clip, overlap: int, gain_points: list[tuple[int, float]]
-) -> bool:
-    """Verifica se cortes de automacao quebram a geometria da transicao.
-
-    Um crossfade de comprimento ``overlap`` exige que o trecho do clipe
-    anterior adjacente a transicao e o trecho inicial do clipe seguinte tenham
-    comprimento >= ``overlap``, sem subdivisao da regiao de overlap.
-    """
-    if not gain_points or not _is_supported_transition(previous_clip, clip, overlap):
-        return False
-
-    prev_dur = previous_clip.timeline_end_samples - previous_clip.timeline_start_samples
-    prev_start = previous_clip.timeline_start_samples
-    prev_cuts = sorted({t - prev_start for t, _ in gain_points if 0 < t - prev_start < prev_dur})
-    prev_adj = prev_dur - prev_cuts[-1] if prev_cuts else prev_dur
-    if prev_adj < overlap:
-        return True
-
-    cur_dur = clip.timeline_end_samples - clip.timeline_start_samples
-    cur_start = clip.timeline_start_samples
-    cur_cuts = sorted({t - cur_start for t, _ in gain_points if 0 < t - cur_start < cur_dur})
-    cur_adj = cur_cuts[0] if cur_cuts else cur_dur
-    if cur_adj < overlap:
-        return True
-
-    return False
-
-
 def _canais_da_track(track, track_channels: int) -> list[int]:
     """Escolhe os canais que precisam ser conferidos numa track."""
     if track_channels == 2:
@@ -90,21 +61,6 @@ def _conferir_clipes_do_canal(session: SessionIR, track, clips_do_canal, report:
                     f"Unsupported overlap of {overlap} samples in the track {track.name!r}, clip {clip.name!r}",
                     {
                         "track": track.name,
-                        "clip": clip.name,
-                        "overlap_samples": overlap,
-                    },
-                )
-                continue
-            if _transition_conflicts_with_automation(
-                previous_clip, clip, overlap, track.gain_points
-            ):
-                report.error(
-                    "WRITE_TRANSITION_SEGMENTED_AUTOMATION_UNSUPPORTED",
-                    f"transition between {previous_clip.name!r} and {clip.name!r} conflicts with "
-                    f"automation segmentation in the overlap region ({overlap} samples)",
-                    {
-                        "track": track.name,
-                        "previous_clip": previous_clip.name,
                         "clip": clip.name,
                         "overlap_samples": overlap,
                     },

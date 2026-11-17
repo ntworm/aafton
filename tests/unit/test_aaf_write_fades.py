@@ -277,11 +277,13 @@ def test_clip_pulado_nao_quebra_o_fade_do_clip_anterior(tmp_path):
     assert _lidos(destino) == [(0, DUR, 0, FO), (DUR + 5000, 2 * DUR + 5000, FI, 0)]
 
 
-def test_automacao_dentro_do_fade_mantem_o_envelope_e_o_erro(tmp_path):
+def test_automacao_dentro_do_fade_mantem_o_envelope_e_vira_aviso(tmp_path):
+    """Fade que cabe no clip mas tem automacao dentro fica no envelope: o som e o mesmo,
+    o fade editavel nao, e o export estrito passa com aviso (decisao de 16/11/2026)."""
     clips = [_clip("a", "t1", 1, ORIGEM + 1000, DUR, fade_in=_entrada(), fade_out=_saida())]
     track = _track("t1", "Dialogo", 1, clips)
     track.gain_points.extend([(ORIGEM + 1000 + FI // 2, 0.5), (ORIGEM + 1000 + DUR // 2, 1.0)])
-    destino, relatorio, _ = _exportar(tmp_path, [], strict=False, track=track)
+    destino, relatorio, _ = _exportar(tmp_path, [], strict=True, track=track)
 
     assert _forma(destino) == [
         ("Filler", 1000),
@@ -289,8 +291,12 @@ def test_automacao_dentro_do_fade_mantem_o_envelope_e_o_erro(tmp_path):
         ("Transition", FO),
         ("Filler", FO),
     ]
-    assert "WRITE_FADE_UNSUPPORTED" in _codigos(relatorio)
+    assert "WRITE_FADE_UNSUPPORTED" not in _codigos(relatorio)
     assert "FADE_CONVERTED_TO_ENVELOPE" in _codigos(relatorio)
+    envelope = [i for i in relatorio.issues if i.code == "WRITE_FADE_AS_ENVELOPE"]
+    assert [(i.severity, i.context) for i in envelope] == [
+        ("warning", {"clip": "a1.wav", "track": "Dialogo"})
+    ]
     avisos = [i for i in relatorio.issues if i.code == "FADE_WRITTEN_AS_TRANSITION"]
     assert [a.context for a in avisos] == [{"track": "Dialogo", "fades": 1}]
 
@@ -330,9 +336,33 @@ def test_fade_do_clip_depois_de_um_par_pulado_nao_some(tmp_path):
     assert [a.context for a in avisos] == [{"track": "Dialogo", "fades": 1}]
 
 
-def test_fade_do_clip_depois_de_um_crossfade_recusado_pela_automacao_nao_some(tmp_path):
-    """O crossfade que conflita com a automacao deixa o clip do meio fora do AAF; o fade-in
-    do clip seguinte e gravado, e o fade-out do primeiro, com automacao dentro, e erro."""
+def _keyframes_por_clip(destino):
+    """Pontos (tempo normalizado, ganho) do envelope de cada clip do primeiro slot."""
+    import aaf2
+
+    from aafton.aaf_read_components import _descer_ate_sequence
+
+    with aaf2.open(str(destino), "r") as f:
+        comp = next(m for m in f.content.mobs if type(m).__name__ == "CompositionMob")
+        slot = next(s for s in comp.slots if s.segment.media_kind == "Sound")
+        pontos = []
+        for comp_seq in _descer_ate_sequence(slot.segment).components:
+            if type(comp_seq).__name__ != "OperationGroup":
+                continue
+            for param in comp_seq["Parameters"].value:
+                if type(param).__name__ == "VaryingValue":
+                    pontos.append(
+                        [(float(cp.time), float(cp.value)) for cp in param["PointList"].value]
+                    )
+                else:
+                    pontos.append([("constante", float(param.value))])
+        return pontos
+
+
+def test_crossfade_com_automacao_dentro_vira_transition_e_nenhum_clip_sai(tmp_path):
+    """Cada clip vai ao AAF inteiro com o proprio envelope: a automacao dentro do overlap
+    nao impede a Transition, nenhum clip fica fora e o envelope dos dois lados segue a
+    automacao, relido do AAF."""
     curto = 2000
     clips = [
         _clip("a", "t1", 1, ORIGEM, curto, fade_out=_saida(500)),
@@ -340,22 +370,28 @@ def test_fade_do_clip_depois_de_um_crossfade_recusado_pela_automacao_nao_some(tm
         _clip("a", "t1", 3, ORIGEM + 3000, curto, fade_in=_entrada(500)),
     ]
     track = _track("t1", "Dialogo", 1, clips)
-    track.gain_points.extend([(ORIGEM + 1600, 0.5)])
-    destino, relatorio, _ = _exportar(tmp_path, [], strict=False, track=track)
+    track.gain_points.extend([(ORIGEM + 1000, 1.0), (ORIGEM + 1800, 0.25)])
+    destino, relatorio, _ = _exportar(tmp_path, [], strict=True, track=track)
 
     codigos = _codigos(relatorio)
-    assert "WRITE_TRANSITION_SEGMENTED_AUTOMATION_UNSUPPORTED" in codigos
-    recusados = [i.context["clip"] for i in relatorio.issues if i.code == "WRITE_FADE_UNSUPPORTED"]
-    assert recusados == ["a1.wav"]
+    assert "WRITE_TRANSITION_SEGMENTED_AUTOMATION_UNSUPPORTED" not in codigos
+    assert "WRITE_CLIP_SKIPPED" not in codigos
+    assert "WRITE_FADE_UNSUPPORTED" not in codigos
     assert _forma(destino) == [
         ("Clip", curto),
-        ("Filler", 1000 + 500),
+        ("Transition", 500),
+        ("Clip", curto),
         ("Transition", 500),
         ("Clip", curto),
     ]
-    assert _lidos(destino) == [(0, curto, 0, 0), (3000, 3000 + curto, 500, 0)]
-    avisos = [i for i in relatorio.issues if i.code == "FADE_WRITTEN_AS_TRANSITION"]
-    assert [a.context for a in avisos] == [{"track": "Dialogo", "fades": 1}]
+    assert _lidos(destino) == [(0, curto, 0, 500), (1500, 3500, 500, 500), (3000, 5000, 500, 0)]
+    # Clip 1 em [0, 2000): pontos em 1000 (0.5) e 1800 (0.9). Clip 2 em [1500, 3500):
+    # comeca no meio da rampa (1.0 - 0.75 * 500/800) e chega a 0.25 em 1800 (0.15).
+    assert _keyframes_por_clip(destino) == [
+        [(0.0, 1.0), (0.5, 1.0), (0.9, 0.25), (1.0, 0.25)],
+        [(0.0, 0.53125), (0.15, 0.25), (1.0, 0.25)],
+        [("constante", 0.25)],
+    ]
 
 
 def test_fade_do_clip_depois_de_um_clip_anterior_ao_inicio_da_sessao_nao_some(tmp_path):

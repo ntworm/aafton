@@ -6,18 +6,35 @@ leitura (o ``ReadContext``) e o nome da track no Live.
 
 from __future__ import annotations
 
+import math
 import xml.etree.ElementTree as ET
 
 from dataclasses import dataclass, field
+from fractions import Fraction
 from pathlib import Path
 
-from .als_crossfade import clip_em_modo_especial, normalizar_crossfades
+from .als_crossfade import clip_em_modo_especial
+from .als_crossfade_ler import normalizar_crossfades
+from .als_loop import (
+    cortar_caudas_de_loop,
+    expandir_clip_em_passadas,
+    loop_expansivel,
+    passadas,
+)
+from .als_leitura import offset_do_warp
 from .als_paths import AUDIO_CLIP_FIELDS
+from .als_render import (
+    RenderLog,
+    e_video,
+    marcar_video,
+    precisa_render,
+    soltar_vizinhos,
+)
 
 from .als_xml import get_value
 from .ir import ClipIR, FadeIR, MediaAsset, SessionIR, TrackIR
 from .report import Report
-from .sidecar import Anchor
+from .sidecar import Anchor, resolve_video_path
 
 
 def track_name(node: ET.Element) -> str:
@@ -70,6 +87,15 @@ class ReadContext:
     session: SessionIR
     media_por_caminho: dict[str, MediaAsset] = field(default_factory=dict)
     metadata_cache: dict[str, dict | None] = field(default_factory=dict)
+    # Set sem o registro do aafton: video por extensao, lista de render e
+    # crossfade nao provado viram regra (ver als_render).
+    sem_sidecar: bool = False
+    render: RenderLog = field(default_factory=RenderLog)
+
+    @property
+    def tempo(self) -> Fraction:
+        """O tempo do set, exato a partir do texto do numero."""
+        return Fraction(str(self.anchor.bpm))
 
     def absolute(self, beats: float) -> int:
         """Posicao na timeline, em samples, somando a origem do Live."""
@@ -78,6 +104,10 @@ class ReadContext:
     def samples(self, beats: float) -> int:
         """Beats convertidos em samples, sem a origem do Live."""
         return _beats_to_samples(beats, self.anchor.sample_rate, self.anchor.bpm)
+
+    def source_samples(self, seconds: float) -> int:
+        """Segundos do arquivo (marcadores de loop sem warp) em samples da sessao."""
+        return _beats_to_samples(seconds, self.anchor.sample_rate, 60.0)
 
 
 def _clip_causas_modo(clip_node: ET.Element) -> list[str]:
@@ -93,9 +123,6 @@ def _clip_causas_modo(clip_node: ET.Element) -> list[str]:
     inicio_relativo = float(get_value(clip_node, "Loop/StartRelative") or 0)
     if inicio_relativo != 0:
         causas.append(f"StartRelative={inicio_relativo:g}")
-    escala = clip_node.find("ScaleInformation")
-    if escala is not None:
-        causas.append("time_map")
     return causas
 
 
@@ -145,8 +172,10 @@ def _read_clip_fields(
         loop_start = float(get_value(clip_node, AUDIO_CLIP_FIELDS["loop_start"]))
         nome = get_value(clip_node, AUDIO_CLIP_FIELDS["name"])
 
-        if ctx.anchor.video_path and _same_media_path(caminho, ctx.anchor.video_path):
-            track.is_video = True
+        if ctx.anchor.video_path:
+            resolved_video = str(resolve_video_path(ctx.anchor.video_path, ctx.path))
+            if _same_media_path(caminho, resolved_video):
+                track.is_video = True
 
     except (KeyError, TypeError, ValueError) as exc:
         ctx.report.error(
@@ -313,25 +342,19 @@ def _clip_fades(
     return (fade_in, fade_out)
 
 
-def _read_clip(
+def _clip_ir_do_no(
     ctx: ReadContext,
     track: TrackIR,
     clip_node: ET.Element,
+    fields: _ClipFields,
     indice: int,
     evento: int,
-) -> ClipIR | None:
-    """Le um clip do arrangement; clip ilegivel e pulado mas conta o indice."""
-    _report_clip_mode(ctx, track, clip_node)
-
-    fields = _read_clip_fields(ctx, track, clip_node)
-    if fields is None:
-        return None
-
+    fade_in: FadeIR | None,
+    fade_out: FadeIR | None,
+) -> ClipIR:
+    """Constroi o ClipIR basico a partir do no e dos campos lidos."""
     asset = _media_asset(ctx, fields.caminho)
-    gain_linear = _clip_gain(clip_node)
-    fade_in, fade_out = _clip_fades(ctx, clip_node)
-
-    clip = ClipIR(
+    return ClipIR(
         id=f"t{indice}c{evento}",
         track_id=track.id,
         channel_index=0,
@@ -340,15 +363,99 @@ def _read_clip(
         media_id=asset.id,
         timeline_start_samples=ctx.absolute(fields.inicio),
         timeline_end_samples=ctx.absolute(fields.fim),
-        source_offset_samples=ctx.samples(fields.loop_start),
-        gain_linear=gain_linear,
+        source_offset_samples=_offset(ctx, clip_node, fields.loop_start),
+        gain_linear=_clip_gain(clip_node),
         muted=get_value(clip_node, "Disabled") == "true",
         fade_in=fade_in,
         fade_out=fade_out,
         crossfade_in_state=(get_value(clip_node, AUDIO_CLIP_FIELDS["crossfade_in_state"]) == "1"),
     )
+
+
+def _read_clip(
+    ctx: ReadContext,
+    track: TrackIR,
+    clip_node: ET.Element,
+    indice: int,
+    evento: int,
+    proximo_evento: list[int] | None = None,
+) -> ClipIR | None:
+    """Le um clip do arrangement; clip ilegivel e pulado mas conta o indice."""
+    if not ctx.sem_sidecar:
+        _report_clip_mode(ctx, track, clip_node)
+    elif not _triagem(ctx, track, clip_node):
+        return None
+
+    fields = _read_clip_fields(ctx, track, clip_node)
+    if fields is None:
+        return None
+
+    fade_in, fade_out = _clip_fades(ctx, clip_node)
+    clip = _clip_ir_do_no(ctx, track, clip_node, fields, indice, evento, fade_in, fade_out)
+    origem = ctx.anchor.live_origin_samples
+    inicio_abs = clip.timeline_start_samples
+    fim_abs = clip.timeline_end_samples
+    if ctx.sem_sidecar and loop_expansivel(
+        clip_node, ctx.tempo, ctx.anchor.sample_rate, origem, inicio_abs, fim_abs
+    ):
+        contador = proximo_evento if proximo_evento is not None else [evento + 1]
+        lista = passadas(clip_node, ctx.tempo, ctx.anchor.sample_rate, origem, inicio_abs, fim_abs)
+        expandidos = expandir_clip_em_passadas(lista, clip, fade_in, fade_out, contador)
+        track.clips.extend(expandidos)
+        return expandidos[0]
     track.clips.append(clip)
     return clip
+
+
+def _limites_em_amostras(
+    ctx: ReadContext, clip_node: ET.Element
+) -> tuple[int | None, int | None, int | None]:
+    """Origem e inicio/fim em amostras quando CurrentStart e CurrentEnd sao finitos."""
+    try:
+        inicio = float(get_value(clip_node, AUDIO_CLIP_FIELDS["current_start"]))
+        fim = float(get_value(clip_node, AUDIO_CLIP_FIELDS["current_end"]))
+    except (TypeError, ValueError):
+        return None, None, None
+    if not (math.isfinite(inicio) and math.isfinite(fim)):
+        return None, None, None
+    return ctx.anchor.live_origin_samples, ctx.absolute(inicio), ctx.absolute(fim)
+
+
+def _triagem(ctx: ReadContext, track: TrackIR, clip_node: ET.Element) -> bool:
+    """Sem sidecar: o video sai, e o clip de render entra na lista ou fica de fora.
+
+    Devolve se o clip segue para a leitura. Um clip sem caminho de midia segue:
+    a leitura normal reporta o clip ilegivel.
+    """
+    try:
+        caminho = _media_path(clip_node, ctx.path)
+    except ValueError:
+        return True
+    nome = get_value(clip_node, AUDIO_CLIP_FIELDS["name"]) or ""
+    if e_video(caminho):
+        ctx.render.video(track, nome)
+        return False
+    origem, inicio_abs, fim_abs = _limites_em_amostras(ctx, clip_node)
+    causas = precisa_render(
+        clip_node,
+        ctx.tempo,
+        ctx.anchor.sample_rate,
+        origem,
+        inicio_abs,
+        fim_abs,
+    )
+    if causas:
+        ctx.render.clip(track, nome, causas, clip_node)
+    return not ctx.render.deixado(clip_node)
+
+
+def _offset(ctx: ReadContext, clip_node: ET.Element, loop_start: float) -> int:
+    """Offset na midia: segundos do arquivo, ou o SecTime de um clip com warp 1:1."""
+    if ctx.sem_sidecar and get_value(clip_node, AUDIO_CLIP_FIELDS["is_warped"]) == "true":
+        offset = offset_do_warp(clip_node, ctx.anchor.sample_rate)
+        if offset is not None:
+            return offset
+    return ctx.source_samples(loop_start)
 
 
 def read_track_clips(
@@ -361,10 +468,15 @@ def read_track_clips(
     arrangement = track_node.findall(
         "DeviceChain/MainSequencer/Sample/ArrangerAutomation/Events/AudioClip"
     )
+    proximo_evento = [len(arrangement)]
     pares: list[tuple[ClipIR, ET.Element]] = []
     for evento, clip_node in enumerate(arrangement):
-        clip = _read_clip(ctx, track, clip_node, indice, evento)
+        clip = _read_clip(ctx, track, clip_node, indice, evento, proximo_evento)
         if clip is not None:
             pares.append((clip, clip_node))
+    if ctx.sem_sidecar:
+        cortar_caudas_de_loop(track, ctx.report)
+        marcar_video(ctx.render, track, arrangement)
+        soltar_vizinhos(ctx.render, track, arrangement, pares)
     if not track.is_video:
         normalizar_crossfades(ctx, pares)
