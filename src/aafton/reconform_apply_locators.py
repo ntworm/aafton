@@ -181,9 +181,13 @@ def _append_change_locators(
     anchor: Anchor,
     report: Report,
 ) -> None:
-    """Adiciona marcadores RC para mudancas nao-shift com posicao no corte novo."""
+    """Adiciona marcadores RC para mudancas nao-shift com posicao no corte novo.
+
+    O trecho sem correspondencia ('unresolved') nao vira marcador: ele nao e um
+    evento do set; o aviso RECONFORM_REUSE_UNRESOLVED e que o lista.
+    """
     for change in cl.changes:
-        if change.kind in ("shift", "ambiguous") or change.new_in is None:
+        if change.kind in ("shift", "unresolved") or change.new_in is None:
             continue
         new_tc = frames_to_label(change.new_in, cl.rate)
         name = f"RC {change.kind} {new_tc}"
@@ -195,9 +199,15 @@ def _frames_do_material(samples: int, rate: TimecodeRate, sample_rate: int) -> i
 
     O arredondamento e para cima: um material que nao completa um frame ainda
     tira um frame do set, e reportar zero frames esconderia a remocao.
+
+    Cada extremo do material foi arredondado para o sample mais proximo, e a
+    diferenca entre eles pode errar ate um sample: esse sample e arredondamento
+    e nao material, entao ele nao pode virar um frame a mais.
     """
-    frames = Fraction(samples) / samples_per_frame(rate, sample_rate)
-    return math.ceil(frames)
+    if samples <= 0:
+        return 0
+    frames = (Fraction(samples) - 1) / samples_per_frame(rate, sample_rate)
+    return max(1, math.ceil(frames))
 
 
 def _detalhe_da_cauda(smap: SampleMap, cl: ChangeList, anchor: Anchor) -> str | None:
@@ -205,7 +215,8 @@ def _detalhe_da_cauda(smap: SampleMap, cl: ChangeList, anchor: Anchor) -> str | 
 
     None quando o set nao tem material depois do ultimo evento do corte
     antigo: a cauda nao remove material nenhum do set. O material e medido
-    em frames inteiros, arredondados para cima.
+    em frames inteiros, arredondados para cima, e o sample de arredondamento
+    dos extremos nao conta como material.
     """
     cauda = smap.cauda_material()
     if cauda is None:

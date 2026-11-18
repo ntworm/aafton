@@ -88,7 +88,14 @@ def detect_accepted_pairs(session: SessionIR, stereo: str = "pair") -> set[PairK
 
 
 def is_track_excluded(track: TrackIR, excluded_source_indices: Collection[int]) -> bool:
-    """Indica se a track esta fora do alcance da organizacao."""
+    """Indica se a track esta fora do alcance da organizacao.
+
+    A track muda fica fora do alcance: o .als nao grava o mudo do clip
+    (als_write_clips.py e als_paths.AUDIO_CLIP_FIELDS), e um clip que sai de
+    uma track muda para uma track audivel passaria a tocar. A track muta
+    tambem nao pode ser a home de destino, senao ela cala os clips que vieram
+    de tracks audiveis.
+    """
     return (
         track.source_index in excluded_source_indices
         or track.expansion_group is not None
@@ -96,6 +103,7 @@ def is_track_excluded(track: TrackIR, excluded_source_indices: Collection[int]) 
         or track.is_video
         or track.kind == "video"
         or track.name.strip().upper() == "LTC"
+        or track.muted
     )
 
 

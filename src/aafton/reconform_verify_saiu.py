@@ -17,6 +17,7 @@ from .reconform_verify import (
     _frames,
     _para_samples,
 )
+from .reconform_verify_velocidade import tc_do_frame
 
 # Uma amostra: a tolerancia da posicao conferida.
 _TOLERANCIA = 1
@@ -55,7 +56,7 @@ def _esperado(ctx: _Ctx, inicio: int) -> int | None:
     evento = _evento_em(ctx.old.events, frame)
     if evento is None or evento.source_in is None:
         return None
-    tc = evento.source_in + (frame - evento.record_in)
+    tc = tc_do_frame(evento, frame)
     guardado = _frame_guardado(ctx, evento, tc)
     if guardado is None:
         return None

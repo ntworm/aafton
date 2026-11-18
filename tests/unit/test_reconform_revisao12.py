@@ -217,7 +217,7 @@ def test_fuzz_da_revisao_12(tmp_path: Path) -> None:
         b = CutIR("n", RATE_25, H, novo)
         try:
             cl = diff_cuts(a, b, Report(strict=False))
-            if cl is None or cl.ambiguous:
+            if cl is None:
                 continue
             if cl.time_map is None:
                 ruins.append((seed, "time_map None"))

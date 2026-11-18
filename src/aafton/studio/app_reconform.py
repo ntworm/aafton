@@ -27,9 +27,9 @@ _ROTULOS = {
     "trim_head": "Head trimmed",
     "trim_tail": "Tail trimmed",
     "transition": "Transition",
-    "ambiguous": "Ambiguous",
+    "unresolved": "Not matched",
 }
-_ESTADOS = {"ambiguous": "err", "delete": "warn", "insert": "warn"}
+_ESTADOS = {"ambiguous": "err", "delete": "warn", "insert": "warn", "unresolved": "warn"}
 
 
 def _caminho(payload: dict, chave: str) -> Path | None:
@@ -100,7 +100,7 @@ def _linhas(cl: ChangeList) -> list[dict]:
 def _fatos(cl: ChangeList) -> list[dict]:
     fatos = [app_view.fact("Changes", str(len(cl.changes)), app_view.rate_label(cl.rate))]
     for tipo, quantos in sorted(cl.counts.items()):
-        st = "err" if tipo == "ambiguous" else None
+        st = {"ambiguous": "err", "unresolved": "warn"}.get(tipo)
         fatos.append(app_view.fact(_ROTULOS.get(tipo, tipo), str(quantos), None, st))
     return fatos
 
@@ -121,6 +121,7 @@ def read(payload: dict) -> dict:
         "ok": True,
         "direction": DIRECTION,
         "ambiguous": cl.ambiguous,
+        "unresolved": cl.counts.get("unresolved", 0),
         "facts": _fatos(cl),
         "items": _linhas(cl),
         "notes": app_view.notes(report.issues),

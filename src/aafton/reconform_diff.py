@@ -1,54 +1,23 @@
 """Comparacao entre duas listas de corte de imagem (CutIR) para reconformacao.
 
-Calcula as pecas casadas por chave de origem e timecode de origem, identifica
-ambiguidades e mudancas, e produz o ChangeList com o TimeMap associado.
+Casa as pecas por origem e timecode de origem, com a velocidade do plano,
+resolve por ordem o material repetido e produz o ChangeList com o TimeMap
+associado.
 """
 
 from __future__ import annotations
 
-from bisect import bisect_left
-from collections.abc import Callable, Sequence
+from collections.abc import Sequence
 from dataclasses import dataclass
 
 from .cut_ir import CutEvent, CutIR
+from .reconform_diff_reuso import UNRESOLVED_DETAIL, Resolution, Unresolved
+from .reconform_diff_reuso import lis_positions, resolve_reuse
+from .reconform_diff_velocidade import Match as _Match
+from .reconform_diff_velocidade import Piece, SpeedChanged, mark_speed_changed, match_events
 from .reconform_map import TimeMap, build_time_map, uncovered_clip_spans
 from .report import Report
 from .timecode import TimecodeRate
-
-
-@dataclass(frozen=True)
-class Piece:
-    """Trecho continuo casado entre um evento antigo e um evento novo."""
-
-    old_in: int
-    old_out: int
-    new_in: int
-    old_index: int
-    new_index: int
-
-    @property
-    def new_out(self) -> int:
-        """Frame final exclusivo no corte novo."""
-        return self.new_in + (self.old_out - self.old_in)
-
-    @property
-    def delta(self) -> int:
-        """Deslocamento em frames do corte antigo para o novo."""
-        return self.new_in - self.old_in
-
-    @property
-    def duration_frames(self) -> int:
-        """Duracao da peca em frames."""
-        return self.old_out - self.old_in
-
-
-@dataclass(frozen=True)
-class _Match:
-    """Associacao interna entre uma Piece e os dois eventos de origem."""
-
-    piece: Piece
-    old_event: CutEvent
-    new_event: CutEvent
 
 
 @dataclass(frozen=True)
@@ -83,86 +52,6 @@ class ChangeList:
 def _rate_tuple(rate: TimecodeRate) -> tuple[int, int, bool]:
     """Tupla comparavel da taxa de frames (num, den, drop_frame)."""
     return (rate.num, rate.den, rate.drop_frame)
-
-
-def _has_source_tc(ev: CutEvent) -> bool:
-    """Verdadeiro quando o evento possui chave de origem e intervalo de TC."""
-    return ev.source is not None and ev.source_in is not None and ev.source_out is not None
-
-
-def _pair_piece(old_ev: CutEvent, new_ev: CutEvent) -> Piece | None:
-    """Calcula a Piece da intersecao de source TC entre dois eventos de clip."""
-    if old_ev.source is None or old_ev.source != new_ev.source:
-        return None
-    if old_ev.source_in is None or old_ev.source_out is None:
-        return None
-    if new_ev.source_in is None or new_ev.source_out is None:
-        return None
-    start = max(old_ev.source_in, new_ev.source_in)
-    end = min(old_ev.source_out, new_ev.source_out)
-    if end <= start:
-        return None
-    length = end - start
-    old_in = old_ev.record_in + (start - old_ev.source_in)
-    new_in = new_ev.record_in + (start - new_ev.source_in)
-    return Piece(old_in, old_in + length, new_in, old_ev.index, new_ev.index)
-
-
-def _index_new_clips(new: CutIR) -> dict[str, list[CutEvent]]:
-    """Agrupa clips validos do corte novo pela chave de origem normalizada."""
-    grouped: dict[str, list[CutEvent]] = {}
-    for ev in new.events:
-        if ev.kind == "clip" and _has_source_tc(ev) and ev.source is not None:
-            grouped.setdefault(ev.source, []).append(ev)
-    return grouped
-
-
-def _match_sort_key(match: _Match) -> tuple[int, int, int, int, int]:
-    """Chave deterministica para ordenar pecas casadas."""
-    p = match.piece
-    return (p.old_in, p.old_out, p.new_in, p.old_index, p.new_index)
-
-
-def _collect_matches(old: CutIR, new: CutIR) -> list[_Match]:
-    """Casa todos os pares de clips com intersecao nao vazia de source TC."""
-    new_by_source = _index_new_clips(new)
-    matches: list[_Match] = []
-    for old_ev in old.events:
-        if old_ev.kind != "clip" or not _has_source_tc(old_ev):
-            continue
-        assert old_ev.source is not None
-        for new_ev in new_by_source.get(old_ev.source, ()):
-            piece = _pair_piece(old_ev, new_ev)
-            if piece is not None:
-                matches.append(_Match(piece=piece, old_event=old_ev, new_event=new_ev))
-    matches.sort(key=_match_sort_key)
-    return matches
-
-
-def _overlapping_indices(
-    pieces: Sequence[Piece],
-    bounds: Callable[[Piece], tuple[int, int]],
-) -> set[int]:
-    """Indices das pecas que se sobrepoem na linha de tempo projetada."""
-    ordered = sorted(range(len(pieces)), key=lambda idx: bounds(pieces[idx]))
-    active: list[tuple[int, int]] = []
-    flagged: set[int] = set()
-    for idx in ordered:
-        start, end = bounds(pieces[idx])
-        active = [(other_idx, other_end) for other_idx, other_end in active if other_end > start]
-        if active:
-            flagged.add(idx)
-            for other_idx, _ in active:
-                flagged.add(other_idx)
-        active.append((idx, end))
-    return flagged
-
-
-def _ambiguous_indices(pieces: Sequence[Piece]) -> set[int]:
-    """Indices das pecas ambiguas por sobreposicao no corte antigo ou novo."""
-    old_hits = _overlapping_indices(pieces, lambda p: (p.old_in, p.old_out))
-    new_hits = _overlapping_indices(pieces, lambda p: (p.new_in, p.new_out))
-    return old_hits | new_hits
 
 
 def _piece_change(kind: str, match: _Match, detail: str) -> Change:
@@ -266,38 +155,13 @@ def _trim_changes(matches: Sequence[_Match]) -> list[Change]:
     return changes
 
 
-def _lis_positions(values: Sequence[int]) -> set[int]:
-    """Indices da maior subsequencia estritamente crescente em values."""
-    if not values:
-        return set()
-    tails: list[int] = []
-    tail_idx: list[int] = []
-    parent = [-1] * len(values)
-    for idx, val in enumerate(values):
-        pos = bisect_left(tails, val)
-        if pos == len(tails):
-            tails.append(val)
-            tail_idx.append(idx)
-        else:
-            tails[pos] = val
-            tail_idx[pos] = idx
-        if pos > 0:
-            parent[idx] = tail_idx[pos - 1]
-    keep: set[int] = set()
-    cur = tail_idx[-1]
-    while cur != -1:
-        keep.add(cur)
-        cur = parent[cur]
-    return keep
-
-
 def _move_and_shift_changes(matches: Sequence[_Match]) -> list[Change]:
     """Classifica pecas fora da LIS como 'move' e mudancas de delta na LIS como 'shift'.
 
     A primeira peca e comparada com o delta zero: um corte novo todo
     deslocado marca um 'shift' no primeiro plano, e nao em nenhum.
     """
-    lis = _lis_positions([m.piece.new_in for m in matches])
+    lis = lis_positions([m.piece.new_in for m in matches])
     changes: list[Change] = []
     prev_delta = 0
     for idx, match in enumerate(matches):
@@ -373,6 +237,44 @@ def _build_time_map(
         return None
 
 
+def _unresolved_changes(unresolved: Sequence[Unresolved]) -> list[Change]:
+    """Gera mudancas 'unresolved' para os trechos que a ordem nao resolveu."""
+    return [
+        Change(
+            "unresolved",
+            item.old_in,
+            item.old_out,
+            item.new_in,
+            item.new_out,
+            item.source,
+            None,
+            UNRESOLVED_DETAIL,
+        )
+        for item in unresolved
+    ]
+
+
+def _changes(
+    old: CutIR,
+    new: CutIR,
+    resolution: Resolution,
+    changed: Sequence[SpeedChanged],
+    report: Report,
+) -> tuple[list[Change], TimeMap | None]:
+    """Mudanclas da lista e mapa temporal dos cortes ja resolvidos."""
+    pieces = [match.piece for match in resolution.matches]
+    changes: list[Change] = []
+    changes.extend(_uncovered_changes(old.events, [(p.old_in, p.old_out) for p in pieces], True))
+    changes.extend(_uncovered_changes(new.events, [(p.new_in, p.new_out) for p in pieces], False))
+    changes.extend(_unresolved_changes(resolution.unresolved))
+    changes = mark_speed_changed(changes, changed)
+    changes.extend(_trim_changes(resolution.matches))
+    changes.extend(_move_and_shift_changes(resolution.matches))
+    changes.extend(_transition_changes(resolution.matches))
+    time_map = _build_time_map(old, new, pieces, report)
+    return changes, time_map
+
+
 def diff_cuts(old: CutIR, new: CutIR, report: Report | None = None) -> ChangeList | None:
     """Compara dois cortes (CutIR) e constroi o ChangeList e o TimeMap."""
     active_report = report if report is not None else Report()
@@ -383,22 +285,9 @@ def diff_cuts(old: CutIR, new: CutIR, report: Report | None = None) -> ChangeLis
             "RECONFORM_RATE_MISMATCH", "the frame rates of the two cuts differ", ctx
         )
         return None
-    matches = _collect_matches(old, new)
-    pieces = [match.piece for match in matches]
-    flagged = _ambiguous_indices(pieces)
-    ambiguous = bool(flagged)
-    changes: list[Change] = []
-    changes.extend(_uncovered_changes(old.events, [(p.old_in, p.old_out) for p in pieces], True))
-    changes.extend(_uncovered_changes(new.events, [(p.new_in, p.new_out) for p in pieces], False))
-    if ambiguous:
-        for idx in sorted(flagged):
-            changes.append(_piece_change("ambiguous", matches[idx], "ambiguous overlap"))
-        time_map: TimeMap | None = None
-    else:
-        changes.extend(_trim_changes(matches))
-        changes.extend(_move_and_shift_changes(matches))
-        changes.extend(_transition_changes(matches))
-        time_map = _build_time_map(old, new, pieces, active_report)
+    matches, changed = match_events(old, new)
+    resolution = resolve_reuse(matches, old, new, active_report)
+    changes, time_map = _changes(old, new, resolution, changed, active_report)
     changes.sort(key=_change_sort_key)
     counts = _count_changes(changes)
     return ChangeList(
@@ -407,7 +296,7 @@ def diff_cuts(old: CutIR, new: CutIR, report: Report | None = None) -> ChangeLis
         old.rate,
         changes,
         counts,
-        ambiguous,
+        False,
         time_map,
         old.start_frames,
         new.start_frames,

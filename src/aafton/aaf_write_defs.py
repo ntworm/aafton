@@ -321,3 +321,7 @@ class AafBuilder:
             )
         )
         return operation
+
+
+# Name of the CompositionMob of the export of the Live set.
+DEFAULT_COMPOSITION_NAME = "Exported from Ableton"

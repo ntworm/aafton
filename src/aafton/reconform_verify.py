@@ -1,12 +1,13 @@
 """Verify independente do reconform: a copia aplicada contra os dois cortes.
 
-O oraculo nao usa o mapa de tempo nem o diff do reconform: cada pedaco de clip
-do set de origem e levado ao corte novo pelos eventos dos dois cortes, pelo TC
-de fonte. Assim um erro do mapa nao se esconde atras do proprio mapa.
+O oraculo nao usa o mapa de tempo nem o diff do reconform: ele monta as
+proprias pecas a partir dos dois cortes (reconform_verify_pecas) e usa esse
+conjunto de pecas como unico predicado de correspondencia. Assim um erro do
+mapa nao se esconde atras do proprio mapa.
 
 Os pedacos sao divididos onde o apply divide: nas fronteiras dos eventos do
-corte antigo e onde a cobertura do TC de origem do corte novo comeca e termina
-dentro de um evento antigo. Leader e cauda tambem sao conferidas.
+corte antigo e nas bordas das pecas do verify. Leader e cauda tambem sao
+conferidas.
 """
 
 from __future__ import annotations
@@ -24,6 +25,8 @@ from .als_read_clips import track_name
 from .als_write_base import LIVE_CLIP_TICKS_PER_BEAT
 from .als_xml import DocumentInvalid, classify_id_tags, get_value, load_als, validate_document
 from .cut_ir import CutEvent, CutIR
+from .reconform_verify_pecas import Pecas, montar_pecas
+from .reconform_verify_velocidade import Peca, frame_do_tc
 from .report import Report
 from .sidecar import Anchor, read_anchor
 
@@ -56,11 +59,12 @@ class _Clip:
 
 @dataclass
 class _Ctx:
-    """Os dois cortes, as ancoras e a lista de problemas do verify."""
+    """Os dois cortes, as pecas do verify e a lista de problemas."""
 
     old: CutIR
     new: CutIR
     sample_rate: int
+    pecas: Pecas
     problems: list[dict] = field(default_factory=list)
 
     def problema(self, codigo: str, track: str, detalhe: str) -> None:
@@ -123,16 +127,17 @@ def _evento_em(eventos: list[CutEvent], frame: Fraction) -> CutEvent | None:
     return None
 
 
-def _destinos(ctx: _Ctx, fonte: str | None, tc: Fraction) -> list[CutEvent]:
-    return [
-        n
-        for n in ctx.new.events
-        if n.kind == "clip"
-        and n.source == fonte
-        and n.source_in is not None
-        and n.source_out is not None
-        and n.source_in <= tc < n.source_out
-    ]
+def _destinos(ctx: _Ctx, frame: int | Fraction) -> list[int | Fraction]:
+    """Quadros do corte novo que casam com um frame do corte antigo.
+
+    O conjunto de pecas do verify e o unico predicado de correspondencia: um
+    frame do corte antigo casa quando alguma peca o cobre, e a peca sabe o
+    frame do corte novo que corresponde.
+    """
+    peca = ctx.pecas.peca_de(frame)
+    if peca is None:
+        return []
+    return [peca.new_in + (frame - peca.old_in)]
 
 
 def _tem_tc(evento: CutEvent) -> bool:
@@ -145,24 +150,13 @@ def _tem_tc(evento: CutEvent) -> bool:
     )
 
 
-def _eventos_de_clip(corte: CutIR) -> list[CutEvent]:
-    """Eventos de clip do corte que podem ser casados por TC de origem."""
-    return [evento for evento in corte.events if _tem_tc(evento)]
+def _interseccoes(ctx: _Ctx) -> list[Peca]:
+    """As intersecoes entre os dois cortes: as pecas do verify.
 
-
-def _interseccoes(ctx: _Ctx) -> list[tuple[CutEvent, CutEvent, int, int]]:
-    """Pares com TC de origem em comum: evento antigo, evento novo, inicio e fim."""
-    pares: list[tuple[CutEvent, CutEvent, int, int]] = []
-    novos = _eventos_de_clip(ctx.new)
-    for antigo in _eventos_de_clip(ctx.old):
-        for novo in novos:
-            if novo.source != antigo.source:
-                continue
-            inicio = max(antigo.source_in, novo.source_in)
-            fim = min(antigo.source_out, novo.source_out)
-            if fim > inicio:
-                pares.append((antigo, novo, inicio, fim))
-    return pares
+    A peca e o trecho que casa: ela sabe o que entrou e o que saiu de cada
+    corte, e e a unica fonte de correspondencia do verify.
+    """
+    return list(ctx.pecas.pecas)
 
 
 def _frames(ctx: _Ctx, samples: int) -> Fraction:
@@ -180,14 +174,10 @@ def _para_samples(ctx: _Ctx, frames: int) -> int:
 
 def _destino_do_frame(ctx: _Ctx, evento: CutEvent, frame: int) -> int | None:
     """Frame do corte novo para um frame de um evento antigo, ou None."""
-    if evento.source_in is None:
+    peca = ctx.pecas.peca_de(frame)
+    if peca is None or peca.evento_antigo != evento:
         return None
-    tc = evento.source_in + (frame - evento.record_in)
-    destinos = _destinos(ctx, evento.source, tc)
-    if len(destinos) != 1:
-        return None
-    novo = destinos[0]
-    return novo.record_in + (tc - novo.source_in)
+    return peca.new_in + (frame - peca.old_in)
 
 
 def _delta_lider(ctx: _Ctx) -> int:
@@ -196,19 +186,17 @@ def _delta_lider(ctx: _Ctx) -> int:
 
 
 def _maior_tc_coberto(ctx: _Ctx, evento: CutEvent) -> int | None:
-    """Maior TC de origem do evento antigo que o corte novo cobre."""
+    """Maior TC de origem do evento antigo que o corte novo cobre.
+
+    A cobertura vem das pecas do verify: so o material que casa conta.
+    """
     maior = None
-    for novo in _eventos_de_clip(ctx.new):
-        if novo.source != evento.source:
+    for peca in ctx.pecas.pecas:
+        if peca.evento_antigo != evento:
             continue
-        hi = min(novo.source_out, evento.source_out)
-        if hi <= evento.source_in:
-            continue
-        if maior is None or hi > maior:
-            maior = hi
-    if maior is None:
-        return None
-    return maior - 1
+        if maior is None or peca.tc_out - 1 > maior:
+            maior = peca.tc_out - 1
+    return maior
 
 
 def _oraculo_fora(ctx: _Ctx, inicio: int, frame: Fraction) -> tuple[str, int | None]:
@@ -221,96 +209,89 @@ def _oraculo_fora(ctx: _Ctx, inicio: int, frame: Fraction) -> tuple[str, int | N
 
 
 def _oraculo(ctx: _Ctx, inicio: int) -> tuple[str, int | None]:
-    """('map', posicao nova), ('saiu', emenda), ('fora', None) ou ('ambiguo', None)."""
+    """('map', posicao nova), ('saiu', emenda) ou ('fora', None)."""
     frame = _frames(ctx, inicio)
     evento = _evento_em(ctx.old.events, frame)
     if evento is None:
         return _oraculo_fora(ctx, inicio, frame)
     if evento.kind != "clip" or evento.source_in is None:
         return "fora", None
-    tc = evento.source_in + (frame - evento.record_in)
-    destinos = _destinos(ctx, evento.source, tc)
+    destinos = _destinos(ctx, frame)
     if not destinos:
         return "saiu", _emenda(ctx, frame)
-    if len(destinos) > 1:
-        return "ambiguo", None
-    novo = destinos[0]
-    return "map", _samples(ctx, novo.record_in + (tc - novo.source_in))
+    return "map", _samples(ctx, destinos[0])
 
 
-def _tc_coberto(ctx: _Ctx, evento, limite: int) -> int | None:
-    """Maior TC de origem do evento, abaixo do limite, que o corte novo cobre."""
+def _tc_coberto(ctx: _Ctx, evento: CutEvent, limite: int) -> int | None:
+    """Maior TC de origem do evento, abaixo do limite, que o corte novo cobre.
+
+    A cobertura vem das pecas do verify: so o material que casa conta.
+    """
     maior = None
-    for novo in ctx.new.events:
-        if novo.kind != "clip" or novo.source != evento.source:
+    for peca in ctx.pecas.pecas:
+        if peca.evento_antigo != evento:
             continue
-        if novo.source_in is None or novo.source_out is None:
-            continue
-        hi = min(novo.source_out, evento.source_out, limite)
-        lo = max(novo.source_in, evento.source_in)
-        if hi > lo and (maior is None or hi - 1 > maior):
+        hi = min(peca.tc_out, limite)
+        if hi > peca.tc_in and (maior is None or hi - 1 > maior):
             maior = hi - 1
     return maior
 
 
-def _frame_guardado(ctx: _Ctx, evento, tc: int) -> int | None:
+def _frame_guardado(ctx: _Ctx, evento: CutEvent, tc: int) -> int | None:
     """Ultimo frame guardado do corte antigo, antes do trecho removido."""
     guardado = _tc_coberto(ctx, evento, tc)
     if guardado is not None:
-        return evento.record_in + (guardado - evento.source_in)
+        return frame_do_tc(evento, guardado)
     for outro in sorted(ctx.old.events, key=lambda ev: ev.record_in, reverse=True):
-        if outro.kind != "clip" or outro.source_in is None or outro.source_out is None:
+        if not _tem_tc(outro):
             continue
         if outro.record_out > evento.record_in:
             continue
-        coberto = _tc_coberto(ctx, outro, outro.source_out)
+        coberto = _maior_tc_coberto(ctx, outro)
         if coberto is None:
             continue
-        return outro.record_in + (coberto - outro.source_in)
+        return frame_do_tc(outro, coberto)
     return None
 
 
 def _frame_novo(ctx: _Ctx, frame: int) -> int | None:
-    """Frame do corte novo para um frame do corte antigo, pelo TC de origem."""
+    """Frame do corte novo para um frame do corte antigo, pela peca que o cobre."""
     evento = _evento_em(ctx.old.events, frame)
     if evento is None or evento.kind != "clip" or evento.source_in is None:
         return None
-    tc = evento.source_in + (frame - evento.record_in)
-    destinos = _destinos(ctx, evento.source, tc)
-    if len(destinos) != 1:
-        return None
-    novo = destinos[0]
-    return novo.record_in + (tc - novo.source_in)
+    return _destino_do_frame(ctx, evento, frame)
 
 
 def _emenda(ctx: _Ctx, frame) -> int | None:
-    """Ponto de emenda, em samples, do trecho removido que contem o frame."""
+    """Ponto de emenda, em samples, do trecho removido que contem o frame.
+
+    A emenda e o fim no corte novo da ultima peca que termina antes do trecho
+    no corte antigo, como o mapa de tempo faz com prev.new_out: e ali que o
+    material removido entra no corte novo.
+    """
     evento = _evento_em(ctx.old.events, frame)
     if evento is None or evento.kind != "clip" or evento.source_in is None:
         return None
-    tc = evento.source_in + (frame - evento.record_in)
-    guardado = _frame_guardado(ctx, evento, tc)
-    novo = None if guardado is None else _frame_novo(ctx, guardado)
-    if novo is None:
-        novo = ctx.new.start_frames - 1
-    return _samples(ctx, novo + 1)
+    peca = ctx.pecas.peca_antes(frame)
+    if peca is None:
+        return _samples(ctx, ctx.new.start_frames)
+    return _samples(ctx, peca.new_out)
 
 
 def _fronteiras(ctx: _Ctx) -> list[int]:
     """Fronteiras, em samples, onde os pedacos do set precisam ser divididos.
 
-    Alem das fronteiras dos eventos do corte antigo, entram as bordas onde a
-    cobertura do TC de origem do corte novo comeca e termina dentro de um
-    evento antigo: o apply corta os clips nesses pontos, e o verify precisa
+    Alem das fronteiras dos eventos do corte antigo, entram as bordas das
+    pecas do verify: o apply corta os clips nesses pontos, e o verify precisa
     conferir os mesmos pedacos.
     """
     pontos: set[int] = set()
     for evento in ctx.old.events:
         for frame in (evento.record_in, evento.record_out):
             pontos.add(_para_samples(ctx, frame))
-    for antigo, _novo, inicio, fim in _interseccoes(ctx):
-        for tc in (inicio, fim):
-            pontos.add(_para_samples(ctx, antigo.record_in + (tc - antigo.source_in)))
+    for peca in _interseccoes(ctx):
+        for frame in (peca.old_in, peca.old_out):
+            pontos.add(_para_samples(ctx, frame))
     from .reconform_verify_cauda import fronteira_da_cauda
 
     cauda = fronteira_da_cauda(ctx)
@@ -335,9 +316,6 @@ def _conferir_pedaco(ctx: _Ctx, nome: str, pedaco: tuple, aplicado: dict) -> Non
     inicio, fim, loop = pedaco
     tipo, novo = _oraculo(ctx, inicio)
     if tipo == "fora":
-        return
-    if tipo == "ambiguo":
-        ctx.problema("RECONFORM_VERIFY_AMBIGUOUS", nome, f"piece at {inicio} has two destinations")
         return
     if tipo == "saiu":
         # A cauda que nao cabe no corte novo tem emenda propria: ela e
@@ -444,7 +422,14 @@ def verify_reconform(
     origem_p, aplicado_p = Path(source_set), Path(applied_set)
     anchor_o, anchor_a = read_anchor(origem_p), read_anchor(aplicado_p)
     root_o, root_a = load_als(origem_p), load_als(aplicado_p)
-    ctx = _Ctx(old=old, new=new, sample_rate=anchor_o.sample_rate)
+    # As pecas do verify sao montadas uma vez: elas sao o unico predicado de
+    # correspondencia de todo o oraculo.
+    ctx = _Ctx(
+        old=old,
+        new=new,
+        sample_rate=anchor_o.sample_rate,
+        pecas=montar_pecas(old, new),
+    )
     origem = _clips_por_track(root_o, anchor_o)
     aplicado = _clips_por_track(root_a, anchor_a)
     total = _conferir_posicoes(ctx, origem, aplicado)

@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "clips": {
+    "t4c0_ch0": [
+      { "start": 0, "end": 1401363, "offset": 37 }
+    ],
+    "t3c0_ch0": [
+      { "start": 0, "end": 700700, "offset": 10 },
+      { "start": 700700, "end": 1401375, "offset": 700725 }
+    ]
+  }
+}

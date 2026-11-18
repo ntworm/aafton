@@ -11,6 +11,7 @@ from aafton.ltc import parse_ltc_rate
 from aafton.sidecar import read_anchor
 from aafton.timecode import TimecodeRate, frames_to_label, label_to_frames
 from tests.unit.test_reconform_apply import _NEW_EDL_25, _OLD_EDL_25, _build_spanning_set, _sha256
+from tests.unit.test_review_robustness import make_set
 
 pytest.importorskip("opentimelineio")
 
@@ -24,13 +25,33 @@ ORIGEM_23_976 = 86400 * FRAME_23_976
 # O par de EDL do teste mora sobre uma grade de 25 frames.
 GRADE = 25
 
-_AMBIGUO = "\n".join(
+# O par empatado: o mesmo plano (R002) aparece duas vezes no corte novo e a
+# ordem dos planos nao decide entre os dois candidatos. O plano R001, que sai
+# do corte novo, fica no corte antigo antes dos dois.
+_ANTIGO_EMPATE = "\n".join(
     [
-        "TITLE: AMB",
+        "TITLE: OLDTIE",
         "FCM: NON-DROP FRAME",
         "",
-        "001  R001     V     C        01:00:00:00 01:00:02:00 01:00:00:00 01:00:02:00",
-        "002  R001     V     C        01:00:00:00 01:00:02:00 01:00:02:00 01:00:04:00",
+        "001  R001     V     C        06:00:00:00 06:00:01:00 01:00:01:00 01:00:02:00",
+        "* FROM CLIP NAME: shotx.mov",
+        "",
+        "002  R002     V     C        02:00:00:00 02:00:02:00 01:00:02:00 01:00:04:00",
+        "* FROM CLIP NAME: shota.mov",
+        "",
+    ]
+)
+
+_NOVO_EMPATE = "\n".join(
+    [
+        "TITLE: NEWTIE",
+        "FCM: NON-DROP FRAME",
+        "",
+        "001  R002     V     C        02:00:00:00 02:00:02:00 01:00:01:00 01:00:03:00",
+        "* FROM CLIP NAME: shota.mov",
+        "",
+        "002  R002     V     C        02:00:00:00 02:00:02:00 01:00:03:00 01:00:05:00",
+        "* FROM CLIP NAME: shota.mov",
         "",
     ]
 )
@@ -40,6 +61,14 @@ def _edls(tmp_path: Path, novo: str = _NEW_EDL_25) -> tuple[str, str]:
     old_p, new_p = tmp_path / "old.edl", tmp_path / "new.edl"
     old_p.write_text(_OLD_EDL_25, encoding="utf-8")
     new_p.write_text(novo, encoding="utf-8")
+    return str(old_p), str(new_p)
+
+
+def _edls_empate(tmp_path: Path) -> tuple[str, str]:
+    """Grava o par de EDLs empatado: o mesmo plano duas vezes no corte novo."""
+    old_p, new_p = tmp_path / "old.edl", tmp_path / "new.edl"
+    old_p.write_text(_ANTIGO_EMPATE, encoding="utf-8")
+    new_p.write_text(_NOVO_EMPATE, encoding="utf-8")
     return str(old_p), str(new_p)
 
 
@@ -139,11 +168,29 @@ def test_apply_e_verify(tmp_path: Path) -> None:
     assert _sha256(set_path) == antes
 
 
-def test_ambiguo_com_apply_nao_escreve(tmp_path: Path) -> None:
-    old, new = _edls(tmp_path, _AMBIGUO)
-    set_path = _build_spanning_set(tmp_path)
-    assert main(["reconform", old, new, "--set", str(set_path), "--apply"]) == 1
-    assert not (tmp_path / "review reconform.als").exists()
+def test_empate_com_apply_escreve(tmp_path: Path, capsys) -> None:
+    """O par empatado e aplicado e o trecho sem correspondencia fica listado."""
+    old, new = _edls_empate(tmp_path)
+    set_path = make_set(tmp_path)
+    csv = tmp_path / "lista.csv"
+    argumentos = [
+        "reconform",
+        old,
+        new,
+        "--set",
+        str(set_path),
+        "--apply",
+        "--verify",
+        "--csv",
+        str(csv),
+    ]
+    assert main(argumentos) == 0
+    assert (tmp_path / "review reconform.als").exists()
+    saida = capsys.readouterr().out
+    assert "unresolved | old 01:00:02:00 -> 01:00:04:00" in saida
+    assert "RECONFORM_REUSE_UNRESOLVED" in saida
+    linhas = csv.read_text(encoding="utf-8").splitlines()
+    assert any(linha.startswith("unresolved,") for linha in linhas)
 
 
 @pytest.mark.parametrize("extra", [["--apply"], ["--out", "x.als"], ["--verify"]])

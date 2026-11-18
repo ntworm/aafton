@@ -95,6 +95,21 @@ _NEW_TRIM_EDL = "\n".join(
     ]
 )
 
+# O par empatado: o mesmo plano (R002) aparece duas vezes no corte novo e a
+# ordem dos planos nao decide entre os dois candidatos. O plano R001, que sai
+# do corte novo, deixa o corte antigo com um plano antes dos dois candidatos.
+_EV_ANTIGO_X = CutEvent(0, "clip", "R001", None, 216000, 216025, 90025, 90050)
+_EV_ANTIGO_A = CutEvent(1, "clip", "R002", None, 180000, 180050, 90050, 90100)
+_EV_NOVO_A1 = CutEvent(0, "clip", "R002", None, 180000, 180050, 90025, 90075)
+_EV_NOVO_A2 = CutEvent(1, "clip", "R002", None, 180000, 180050, 90075, 90125)
+
+
+def _corte_empate() -> tuple[CutIR, CutIR]:
+    """Os dois cortes do par empatado: o mesmo plano duas vezes no corte novo."""
+    antigo = CutIR("o.edl", RATE_25, 90025, [_EV_ANTIGO_X, _EV_ANTIGO_A])
+    novo = CutIR("n.edl", RATE_25, 90025, [_EV_NOVO_A1, _EV_NOVO_A2])
+    return antigo, novo
+
 
 def _kw(cls, nomes: str, args: tuple, extra: dict):
     """Constroi uma dataclass kw_only a partir de argumentos posicionais do teste."""
@@ -444,27 +459,40 @@ def test_apply_reconform_apaga_a_copia_se_o_sidecar_falha(tmp_path: Path, monkey
     assert set_path.exists()
 
 
-def test_apply_reconform_refuses_ambiguous_and_bad_outputs(tmp_path: Path) -> None:
-    """Recusa ChangeList ambiguo, pasta diferente e destino ja existente."""
+def test_apply_reconform_aplica_o_empate_e_recusa_saidas_invalidas(tmp_path: Path) -> None:
+    """Aplica o par empatado, lista o trecho sem correspondencia e recusa saidas ruins."""
     set_path = make_set(tmp_path)
     orig_als = _sha256(set_path)
     orig_json = _sha256(sidecar_path_for(set_path))
-    ev_old = CutEvent(0, "clip", "A", None, 0, 25, 90000, 90025)
-    ev_new_a = CutEvent(0, "clip", "A", None, 0, 25, 90000, 90025)
-    ev_new_b = CutEvent(1, "clip", "A", None, 0, 25, 90025, 90050)
-    amb_cl = diff_cuts(
-        CutIR("o.edl", RATE_25, 90000, [ev_old]),
-        CutIR("n.edl", RATE_25, 90000, [ev_new_a, ev_new_b]),
-        Report(),
-    )
-    assert amb_cl is not None
+    report_diff = Report()
+    antigo, novo = _corte_empate()
+    emp_cl = diff_cuts(antigo, novo, report_diff)
+    assert emp_cl is not None
+    assert emp_cl.ambiguous is False
+    nao_resolvidos = [c for c in emp_cl.changes if c.kind == "unresolved"]
+    assert len(nao_resolvidos) == 1
+    assert (nao_resolvidos[0].old_in, nao_resolvidos[0].old_out) == (90050, 90100)
+    assert (nao_resolvidos[0].new_in, nao_resolvidos[0].new_out) == (90025, 90125)
+    assert nao_resolvidos[0].source == "R002"
+    avisos = [i for i in report_diff.issues if i.code == "RECONFORM_REUSE_UNRESOLVED"]
+    assert len(avisos) == 1
+    assert avisos[0].severity == "warning"
 
-    rep_amb = Report(strict=False)
-    assert apply_reconform(set_path, amb_cl, rep_amb).written is False
-    assert any(iss.code == "RECONFORM_AMBIGUOUS" for iss in rep_amb.issues)
-    assert not (tmp_path / "review reconform.als").exists()
+    # Sem mapa de tempo a lista continua recusada, em modo estrito e permissivo.
+    sem_mapa = ChangeList("old.edl", "n.edl", RATE_25, [], {}, False, None)
+    rep_sem_mapa = Report(strict=False)
+    assert apply_reconform(set_path, sem_mapa, rep_sem_mapa).written is False
+    assert any(iss.code == "RECONFORM_AMBIGUOUS" for iss in rep_sem_mapa.issues)
     with pytest.raises(StrictModeError):
-        apply_reconform(set_path, amb_cl, Report(strict=True))
+        apply_reconform(set_path, sem_mapa, Report(strict=True))
+    assert not (tmp_path / "review reconform.als").exists()
+
+    report = Report(strict=False)
+    res = apply_reconform(set_path, emp_cl, report)
+    assert res.written is True
+    assert res.output is not None and res.output.exists()
+    assert _sha256(set_path) == orig_als
+    assert _sha256(sidecar_path_for(set_path)) == orig_json
 
     clean_cl = ChangeList("o.edl", "n.edl", RATE_25, [], {}, False, TimeMap(RATE_25))
     outside = tmp_path / "other" / "out.als"
@@ -477,8 +505,6 @@ def test_apply_reconform_refuses_ambiguous_and_bad_outputs(tmp_path: Path) -> No
     rep_exists = Report(strict=False)
     assert apply_reconform(set_path, clean_cl, rep_exists, output=set_path).written is False
     assert any(iss.code == "OUTPUT_EXISTS" for iss in rep_exists.issues)
-    assert _sha256(set_path) == orig_als
-    assert _sha256(sidecar_path_for(set_path)) == orig_json
 
 
 def _make_guard_set(

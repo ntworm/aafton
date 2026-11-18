@@ -67,13 +67,15 @@ App.renderReconform = (p) => {
   }
   const count = (data.items || []).length;
   let foot = count === 1 ? "1 change." : count + " changes.";
-  if (data.ambiguous) foot += " A shot is used twice: the set cannot be conformed.";
+  if (data.unresolved) {
+    foot +=
+      " Some shots are used more than once; those parts were not matched and are listed.";
+  }
   App.fill(p.el, "reconform-foot", foot);
 };
 
-// The primary button needs a set and a change list without ambiguity.
-App.reconformCanRun = (p) =>
-  Boolean(p.data && !p.data.ambiguous && App.text(p.el, "set"));
+// The primary button needs a set and a change list.
+App.reconformCanRun = (p) => Boolean(p.data && App.text(p.el, "set"));
 
 App.reconformGather = (p, body) => {
   Object.assign(body, App.reconformFields(p));

@@ -7,6 +7,10 @@ atribui rotulo de grupo e cores da paleta do Live 12, ordena as tracks e
 relata as unidades que nao puderam ser encontradas. A track do editor que a
 organizacao esvaziou sai da sessao, para o set do Live nao ficar com track
 vazia.
+
+O volume dos clips nao muda: a curva e o fader da track de origem sao
+guardados antes de qualquer clip se mexer e a envelope de cada track de
+destino e refeita com o ganho de origem de cada clip (organize_envelope).
 """
 
 from __future__ import annotations
@@ -24,6 +28,7 @@ from .organize_classify import (
     SFX,
     VO,
 )
+from .organize_envelope import curvas_de_origem, refazer_envelopes
 from .organize_plan import DestinationTrack, Proposal, ProposalGroup
 from .organize_units import OriginKey, Unit, origin_keys_for_track, sort_track_clips
 from .report import Report
@@ -255,6 +260,23 @@ def _renumerar(tracks: list[TrackIR]) -> None:
             clip.event_index = idx
 
 
+def _relatar_tracks_mudas(session: SessionIR, report: Report | None) -> None:
+    """Avisa que as tracks mudas ficaram como estao, com os clips delas.
+
+    A track muda fica fora da organizacao (organize_units.is_track_excluded).
+    """
+    if report is None:
+        return
+    for track in session.tracks:
+        if not track.muted or not track.clips:
+            continue
+        report.info(
+            "ORGANIZE_MUTED_TRACK_KEPT",
+            f"the muted track {track.name!r} stays as it is, with its clips",
+            {"track": track.name},
+        )
+
+
 def apply_proposal(
     session: SessionIR,
     proposal: Proposal,
@@ -266,11 +288,17 @@ def apply_proposal(
 
     Devolve a lista de unidades que nao puderam ser encontradas (por exemplo, um
     par que falhou ao entrelacar na escrita e permaneceu dividido nas tracks do
-    editor). A track do editor que a organizacao esvaziou sai da sessao; a que
-    tem envelope proprio fica, e o relatorio diz o nome dela.
+    editor). A track do editor que a organizacao esvaziou sai da sessao.
+
+    O volume de nenhum clip muda: a curva e o fader da track de origem de cada
+    clip sao guardados antes de qualquer clip se mexer, e depois que todos os
+    clips se movem a envelope de cada track de destino e refeita com o ganho de
+    origem de cada clip. As tracks mudas ficam como estao, com os clips delas.
     """
     use_colors = _usa_cores(proposal, colors)
+    _relatar_tracks_mudas(session, report)
     com_clips = tracks_com_clips(session)
+    curvas = curvas_de_origem(session)
     by_exact, by_single = _index_session_clips(session)
     claimed_tracks: set[int] = set()
     ordered_dest_tracks: list[TrackIR] = []
@@ -293,6 +321,9 @@ def apply_proposal(
             )
             if target is not None:
                 ordered_dest_tracks.append(target)
+
+    for target in ordered_dest_tracks:
+        refazer_envelopes(target, curvas, report)
 
     remaining_tracks = [t for t in session.tracks if id(t) not in claimed_tracks]
     _renumerar(remaining_tracks)

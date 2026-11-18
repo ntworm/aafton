@@ -41,6 +41,46 @@ def _parametro_named(parametros, nome) -> object | None:
     return None
 
 
+def _normalizar_nome(nome) -> str:
+    """Nome de parametro sem espaco e em minusculas.
+
+    O Media Composer grava o parametro de velocidade como 'Speed Ratio', com
+    espaco no meio; outros NLEs gravam 'SpeedRatio'. Os dois nomes sao o
+    mesmo parametro.
+    """
+    return "".join(str(nome).split()).casefold()
+
+
+def _nome_do_parametro(parametro) -> str | None:
+    """Nome do parametro, pelo atributo ou pelo ParameterDef que o define."""
+    candidatos = (
+        getattr(parametro, "name", None),
+        _valor_de_propriedade(parametro, "Name"),
+        getattr(getattr(parametro, "parameterdef", None), "name", None),
+    )
+    for nome in candidatos:
+        if nome:
+            return str(nome)
+    return None
+
+
+def _parametro_por_nome(parametros, nome) -> object | None:
+    """Parametro da operacao, pelo nome sem espaco e sem caixa.
+
+    Devolve o proprio parametro (e nao o valor), porque o valor pode ser
+    constante ou variavel, e quem pergunta precisa saber a diferenca.
+    """
+    alvo = _normalizar_nome(nome)
+    for parametro in parametros or []:
+        try:
+            chave = _nome_do_parametro(parametro)
+        except Exception:
+            continue
+        if chave is not None and _normalizar_nome(chave) == alvo:
+            return parametro
+    return None
+
+
 def _filhos_do_time_warp(no) -> list:
     """Filhos de `no` onde o grupo de efeito de velocidade pode estar.
 

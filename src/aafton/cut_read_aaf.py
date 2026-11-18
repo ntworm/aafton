@@ -12,19 +12,24 @@ from .aaf_read import _escolher_composition
 from .aaf_read_components import (
     _caminho_do_locator,
     _contar_source_clips,
-    _descer_ate_sequence,
     _descritor_fisico,
     _filhos_do_componente,
     _filhos_do_selector,
-    _segmento_do_slot,
     _source_filename,
     _type_name,
     _unwrap,
     _valor_de_propriedade,
 )
 from .aaf_read_session import _read_timecode
-from .aaf_read_tracks import _is_time_warp
 from .cut_ir import CutEvent, CutIR, normalize_source
+from .cut_read_aaf_v1 import _avisar_camadas_superiores, _descida_do_slot, _slot_com_clip
+from .cut_read_aaf_velocidade import (
+    Velocidade,
+    _grupo_e_efeito,
+    _plano_inteiro_por_transicao,
+    _quadro_da_velocidade,
+    _velocidade_do_efeito,
+)
 from .report import Report
 from .timecode import DROP_FRAME_RATES, TimecodeRate, exact_edit_rate
 
@@ -44,6 +49,8 @@ class _WalkState:
     events: list[CutEvent] = field(default_factory=list)
     pending_transition: tuple[int, int, int] | None = None
     aborted: bool = False
+    raw_sources: list[int | None] = field(default_factory=list)
+    warp_indices: set[int] = field(default_factory=set)
 
 
 def read_cut_aaf(path: str | Path, report: Report) -> CutIR | None:
@@ -80,8 +87,12 @@ def _taxa_e_inicio(composition, rate_frac: Fraction, report: Report) -> tuple[Ti
 
 def _percorrer_slot(state: _WalkState, slot) -> bool:
     """Percorre a Sequence do slot de imagem; False quando a leitura abortou."""
-    seq = _descer_ate_sequence(getattr(slot, "segment", None))
-    comps = list(getattr(seq, "components", None) or []) if seq is not None else [slot.segment]
+    segmento = getattr(slot, "segment", None)
+    seq, escopos = _descida_do_slot(segmento)
+    if seq is not None:
+        for escopo in escopos:
+            _avisar_camadas_superiores(state.report, state.rate, state.start_frames, escopo)
+    comps = list(getattr(seq, "components", None) or []) if seq is not None else [segmento]
     for componente in comps:
         _processar_componente(state, componente)
         if state.aborted:
@@ -152,7 +163,11 @@ def _processar_componente(
 
 
 def _processar_composto(state: _WalkState, componente, tipo: str, comprimento: int) -> None:
-    """Desembrulha Sequence, Selector, OperationGroup e NestedScope."""
+    """Desembrulha Sequence, Selector, OperationGroup e NestedScope.
+
+    No NestedScope vale a primeira camada que tem clip, e as camadas de cima
+    que tem clip sobre um vazio da escolhida viram info no relatorio.
+    """
     if tipo == "Sequence":
         for interno in getattr(componente, "components", None) or []:
             _processar_componente(state, interno)
@@ -161,10 +176,10 @@ def _processar_composto(state: _WalkState, componente, tipo: str, comprimento: i
     elif tipo == "OperationGroup":
         _processar_operation_group(state, componente, comprimento)
     elif tipo == "NestedScope":
-        slots = list(getattr(componente, "slots", None) or [])
-        segs = [_segmento_do_slot(s) for s in slots]
-        padrao = segs[0] if segs else None
-        alvo = next((seg for seg in segs if _contar_source_clips(seg) > 0), padrao)
+        _avisar_camadas_superiores(
+            state.report, state.rate, state.start_frames + state.cursor, componente
+        )
+        alvo = _slot_com_clip(componente)
         _processar_componente(state, alvo, fallback_length=comprimento)
     else:
         _registrar_evento(state, "gap", comprimento)
@@ -183,26 +198,67 @@ def _processar_selector(state: _WalkState, componente, comprimento: int) -> None
 
 
 def _processar_operation_group(state: _WalkState, componente, comprimento: int) -> None:
-    """Rejeita TimeWarp e desembrulha demais OperationGroups."""
-    if _is_time_warp(componente):
-        state.report.error(
-            "RECONFORM_TIMEWARP",
-            "picture track contains a TimeWarp effect, which is not supported",
-            {"cursor_frames": state.cursor},
+    """Desembrulha o grupo; um efeito de warping vira velocidade do plano.
+
+    Um grupo que nao carrega o efeito de velocidade e um embrulho: ele e
+    aberto antes, para que cada plano dentro dele vire um evento do corte.
+    A abertura e de uma camada por vez, e para na primeira camada que e um
+    efeito: um grupo comum que embrulha um grupo de warping nao esconde a
+    velocidade.
+    """
+    if not _grupo_e_efeito(componente):
+        interno = _camada_interna(componente)
+        if interno is not None and _grupo_e_efeito(interno):
+            _registrar_efeito(state, interno, comprimento)
+            return
+        if interno is not None and _type_name(interno) in ("Sequence", "Selector", "NestedScope"):
+            _processar_componente(state, interno, fallback_length=comprimento)
+            return
+    velocidade = _velocidade_do_efeito(componente)
+    if velocidade is not None:
+        clip = velocidade.primeiro_clip
+        _registrar_evento(
+            state, "clip" if clip is not None else "gap", comprimento, clip, velocidade
         )
-        state.aborted = True
         return
     internos, _ = _unwrap(componente)
-    primeiro = internos[0] if internos else None
-    if primeiro is not None and _type_name(primeiro) in ("Sequence", "Selector", "NestedScope"):
-        _processar_componente(state, primeiro, fallback_length=comprimento)
-        return
     clip = next((item for item in internos if _type_name(item) == "SourceClip"), None)
     _registrar_evento(state, "clip" if clip is not None else "gap", comprimento, clip)
 
 
+def _camada_interna(componente):
+    """Primeira camada interna de um OperationGroup, uma camada por vez.
+
+    Os grupos comuns sao atravessados, e a travessia para na primeira
+    camada que e um efeito de velocidade: um grupo comum que embrulha um
+    grupo de warping nao pode esconder a velocidade.
+    """
+    atual = componente
+    visitados: set[int] = set()
+    while _type_name(atual) == "OperationGroup" and not _grupo_e_efeito(atual):
+        if id(atual) in visitados:
+            return None
+        visitados.add(id(atual))
+        segmentos = list(getattr(atual, "segments", None) or [])
+        if not segmentos:
+            return None
+        atual = segmentos[0]
+    return atual if atual is not componente else None
+
+
+def _registrar_efeito(state: _WalkState, grupo, comprimento: int) -> None:
+    """Registra o evento do grupo que e efeito de velocidade."""
+    velocidade = _velocidade_do_efeito(grupo)
+    clip = velocidade.primeiro_clip if velocidade is not None else None
+    _registrar_evento(state, "clip" if clip is not None else "gap", comprimento, clip, velocidade)
+
+
 def _processar_transition(state: _WalkState, componente, comprimento: int) -> None:
-    """Recua o cursor pela sobreposicao e apara o evento anterior ao cut point."""
+    """Recua o cursor pela sobreposicao e apara o evento anterior ao cut point.
+
+    A transicao que cobre um plano com velocidade, mesmo sem apara-lo, torna
+    o plano inteiro: o material passa a andar junto com a gravacao.
+    """
     raw_cp = getattr(componente, "cutpoint", None)
     if raw_cp is None:
         raw_cp = _valor_de_propriedade(componente, "CutPoint")
@@ -212,15 +268,28 @@ def _processar_transition(state: _WalkState, componente, comprimento: int) -> No
     cut_point = transition_start + cutpoint
     if state.events:
         prev = state.events[-1]
+        record_out_antes = prev.record_out
         novo_out = max(prev.record_in, cut_point)
         if novo_out < prev.record_out:
             trim = prev.record_out - novo_out
             src_out = prev.source_out - trim if prev.source_out is not None else None
             state.events[-1] = replace(prev, record_out=novo_out, source_out=src_out)
+        if prev.index in state.warp_indices:
+            raw = state.raw_sources
+            raw_src = raw[prev.index] if prev.index < len(raw) else None
+            state.events[-1] = _plano_inteiro_por_transicao(
+                state.events[-1], raw_src, transition_start, record_out_antes
+            )
     state.pending_transition = (transition_start, comprimento, cut_point)
 
 
-def _registrar_evento(state: _WalkState, kind: str, comprimento: int, source_clip=None) -> None:
+def _registrar_evento(
+    state: _WalkState,
+    kind: str,
+    comprimento: int,
+    source_clip=None,
+    velocidade: Velocidade | None = None,
+) -> None:
     """Registra um CutEvent (clip ou gap), consumindo transicao pendente."""
     raw_in = state.start_frames + state.cursor
     raw_out = raw_in + comprimento
@@ -233,15 +302,36 @@ def _registrar_evento(state: _WalkState, kind: str, comprimento: int, source_cli
         rec_in = max(raw_in, min(cut_point, raw_out))
     head_trim = rec_in - raw_in
 
-    fonte, reel, src_in, src_out = None, None, None, None
+    fonte, reel, raw_src = None, None, None
+    src_in, src_out = None, None
+    speed, whole_only = Fraction(1), False
     if source_clip is not None:
         fonte, reel, raw_src = _resolver_fonte(source_clip, state.rate, state.report)
-        src_in, src_out = raw_src + head_trim, raw_src + comprimento
+        if velocidade is None:
+            src_in, src_out = raw_src + head_trim, raw_src + comprimento
+        else:
+            speed, whole_only, src_in, src_out = _quadro_da_velocidade(
+                velocidade, raw_src, head_trim, raw_out - rec_in, pend is not None
+            )
 
     ev = CutEvent(
-        len(state.events), kind, fonte, reel, src_in, src_out, rec_in, raw_out, t_start, t_frames
+        len(state.events),
+        kind,
+        fonte,
+        reel,
+        src_in,
+        src_out,
+        rec_in,
+        raw_out,
+        t_start,
+        t_frames,
+        speed=speed,
+        whole_only=whole_only,
     )
     state.events.append(ev)
+    state.raw_sources.append(raw_src)
+    if velocidade is not None:
+        state.warp_indices.add(ev.index)
     state.cursor += comprimento
 
 

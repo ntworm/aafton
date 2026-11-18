@@ -2,9 +2,9 @@
 
 A organizacao move os clips do editor para as tracks de destino. A track do
 editor que ficou sem clip nenhum nao tem mais o que levar para o set do Live:
-ela sai da sessao. A track que ja estava vazia antes de organizar fica como
-esta, e a track esvaziada que tem envelope proprio tambem fica, com aviso no
-relatorio.
+ela sai da sessao, mesmo que tenha envelope proprio, porque o envelope foi com
+os clips para as tracks de destino. A track que ja estava vazia antes de
+organizar fica como esta.
 """
 
 from __future__ import annotations
@@ -117,17 +117,15 @@ def test_track_esvaziada_sai_da_sessao() -> None:
     assert [t.name for t in session.tracks] == ["PROD 1", "Audio 3"]
 
 
-def test_track_esvaziada_com_envelope_fica_e_e_relatada() -> None:
-    """A track esvaziada que tem envelope proprio fica, e o relatorio diz qual."""
+def test_track_esvaziada_com_envelope_sai() -> None:
+    """A track esvaziada sai mesmo com envelope proprio: ele foi com os clips."""
     session = _sessao(com_envelope=True)
     proposta = _proposta(session, SINAIS_COM_COMPACT)
     report = Report(strict=False)
     apply_proposal(session, proposta, colors=True, report=report)
-    nomes = [t.name for t in session.tracks]
-    assert "Audio 4" in nomes
-    issue = next(i for i in report.issues if i.code == "ORGANIZE_EMPTY_TRACK_KEPT")
-    assert "Audio 4" in issue.message
-    assert issue.context == {"track": "Audio 4"}
+    # A Audio 4 perdeu o clip para a Audio 1 e nao fica no set.
+    assert [t.name for t in session.tracks] == ["PROD 1", "Audio 3"]
+    assert not [i for i in report.issues if i.code == "ORGANIZE_EMPTY_TRACK_KEPT"]
 
 
 def test_track_vazia_do_comeco_fica() -> None:

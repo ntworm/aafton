@@ -1,0 +1,6 @@
+{
+  "session": ["sample_rate", "start_timecode_samples", "timecode_rate", "unsupported_export_features", "errors"],
+  "media": ["status", "resolved_path", "channels", "sample_rate", "duration_samples", "embedded"],
+  "track": ["id", "name", "kind", "channel_count", "muted", "gain_linear"],
+  "clip": ["id", "name", "track_id", "media_id", "start_samples", "end_samples", "source_offset_samples", "source_channel", "muted", "gain_linear"]
+}

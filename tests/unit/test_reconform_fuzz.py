@@ -169,8 +169,7 @@ def _confere(
 ) -> list[str]:
     """Aplica a reconformacao e confere a copia: escrita, duracao e verify."""
     cl = diff_cuts(antigo, novo, Report(strict=False))
-    if cl.ambiguous:
-        return []
+    assert cl is not None
     report = Report(strict=False)
     res = apply_reconform(set_path, cl, report)
     if not res.written:

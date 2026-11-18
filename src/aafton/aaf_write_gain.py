@@ -69,11 +69,19 @@ def _keyframes_automacao(
     Com curva de automacao, os pontos ficam no interior do clip e os extremos
     valem o valor da curva no inicio e no fim do clip. Sem curva, o ganho do
     clip e constante.
+
+    O keyframe de fim vale o ganho da ultima amostra do clip quando a curva tem
+    um ponto nela: e o degrau que a organizacao monta, com o ponto do clip
+    seguinte em `clip_end_abs`, a amostra depois do clip. Sem ponto na ultima
+    amostra, o keyframe de fim vale a curva em `clip_end_abs`, como antes.
     """
     if not gain_points:
         return [(0.0, base_gain), (1.0, base_gain)]
     val_start = base_gain * _ganho_em(gain_points, clip_start_abs)
-    val_end = base_gain * _ganho_em(gain_points, clip_end_abs)
+    if duration > 1 and any(t == clip_end_abs - 1 for t, _ in gain_points):
+        val_end = base_gain * _ganho_em(gain_points, clip_end_abs - 1)
+    else:
+        val_end = base_gain * _ganho_em(gain_points, clip_end_abs)
     keyframes: list[tuple[float, float]] = [(0.0, val_start)]
     for t_abs, v in gain_points:
         if clip_start_abs < t_abs < clip_end_abs:

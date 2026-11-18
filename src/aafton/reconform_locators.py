@@ -63,12 +63,14 @@ def _build_locator_items(
     """Converte as mudancas em locators no corte antigo e pula posicoes antes da origem.
 
     O 'shift' nao vira marcador: ele esta na change list, mas nao e um evento
-    do set. A copia aplicada tambem nao marca 'shift'.
+    do set. O 'unresolved' tambem nao vira: o trecho sem correspondencia nao
+    e um evento do set, e o aviso RECONFORM_REUSE_UNRESOLVED e que o lista.
+    A copia aplicada tambem nao marca 'shift'.
     """
     to_add: list[_LocatorItem] = []
     skipped: list[dict] = []
     for idx, change in enumerate(cl.changes):
-        if change.kind == "shift":
+        if change.kind in ("shift", "unresolved"):
             continue
         old_frame = _change_old_frame(cl, idx, anchor)
         old_tc = frames_to_label(old_frame, cl.rate)

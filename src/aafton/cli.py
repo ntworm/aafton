@@ -8,7 +8,6 @@ import sys
 from dataclasses import asdict
 from pathlib import Path
 
-from .aaf_read import read_aaf
 from .als_ancora import start_da_linha
 from .als_read import read_session
 from .als_render import recusar_se_parado
@@ -32,6 +31,8 @@ from .cli_organize import OrganizeArgsError, inspect_organize, resolve_organize
 from .cli_locators import add_locators_parser
 from .cli_reconform import add_reconform_parser
 from .cli_ltc import add_ltc_parser
+from .cli_apply import add_apply_parser, inspect_aaf
+from .aaf_inspect_media import clip_to_dict
 from . import __version__
 from .cli_parsers import (
     add_app_parser,
@@ -106,24 +107,14 @@ def _session_to_dict(session: SessionIR) -> dict:
         ],
         "tracks": [
             {
+                "id": track.id,
                 "name": track.name,
                 "kind": track.kind,
+                "muted": track.muted,
+                "gain_linear": track.gain_linear,
                 "channel_count": track.channel_count,
                 "clips_count": len(track.clips),
-                "clips": [
-                    {
-                        "name": clip.name,
-                        "media_id": clip.media_id,
-                        "start_samples": clip.timeline_start_samples,
-                        "end_samples": clip.timeline_end_samples,
-                        "duration_samples": clip.duration_samples,
-                        "source_offset_samples": clip.source_offset_samples,
-                        "gain_linear": clip.gain_linear,
-                        "tc_in": rotulo(clip.timeline_start_samples),
-                        "tc_out": rotulo(clip.timeline_end_samples),
-                    }
-                    for clip in track.clips
-                ],
+                "clips": [clip_to_dict(clip, rotulo) for clip in track.clips],
             }
             for track in session.tracks
         ],
@@ -280,9 +271,11 @@ def cmd_inspect(args: argparse.Namespace) -> int:
         session = read_production(caminho, report)
         _print_json(com_os_dois_tempos(session, _session_to_dict(session)))
         return 0
+    if getattr(args, "extract_dir", None) and not getattr(args, "resolve_media", False):
+        raise ValueError("--extract-dir only works with --resolve-media")
     if sufixo == ".aaf":
-        session = read_aaf(caminho, report)
-    elif sufixo == ".als":
+        return inspect_aaf(args, caminho, _session_to_dict, _print_json)
+    if sufixo == ".als":
         session = read_session(caminho, report, allow_production=True, **_opcoes_do_set(args))
     elif sufixo in ADAPTADORES:
         session = read_origin(caminho, report, edl_rate=_taxa_edl(args))
@@ -449,6 +442,7 @@ def build_parser() -> argparse.ArgumentParser:
     add_ltc_parser(sub)
     add_locators_parser(sub)
     add_reconform_parser(sub)
+    add_apply_parser(sub)
 
     return parser
 

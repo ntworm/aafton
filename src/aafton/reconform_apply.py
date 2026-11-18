@@ -436,11 +436,13 @@ def apply_reconform(
     out_p = locators_write._validate_output_path(set_p, target, report)
     if out_p is None:
         return ApplyResult(output=None, written=False)
-    if cl.ambiguous or cl.time_map is None:
+    if cl.time_map is None:
+        # A recusa de antes era a da lista ambigua; ela fica so por
+        # compatibilidade e agora e apenas do mapa de tempo ausente.
         report.error(
             "RECONFORM_AMBIGUOUS",
-            "ambiguous change list or missing time map cannot be applied",
-            {"ambiguous": cl.ambiguous, "has_time_map": cl.time_map is not None},
+            "the change list has no time map and cannot be applied",
+            {"has_time_map": False},
         )
         return ApplyResult(output=out_p, written=False)
     prepared = _prepare_apply(set_p, cl, report, start_tc)

@@ -1,9 +1,9 @@
 """Oraculo da cauda no verify do reconform, pelos dois cortes.
 
-A cauda (o material depois do ultimo evento do corte antigo) segue o ultimo
-plano antigo que o corte novo cobre, mas so ate o espaco livre no corte novo:
-o que nao cabe vai para a track [saiu], na emenda. A regra e a mesma do apply,
-calculada aqui sem o mapa de tempo.
+A cauda (o material depois do ultimo evento do corte antigo) segue a ultima
+peca do verify, mas so ate o espaco livre no corte novo: o que nao cabe vai
+para a track [saiu], na emenda. A regra e a mesma do apply, calculada aqui sem
+o mapa de tempo.
 """
 
 from __future__ import annotations
@@ -13,13 +13,9 @@ from dataclasses import dataclass
 from .reconform_verify import (
     _Ctx,
     _base_saiu,
-    _destino_do_frame,
     _frames,
-    _interseccoes,
-    _maior_tc_coberto,
     _para_samples,
     _samples,
-    _tem_tc,
 )
 
 # Uma amostra: a tolerancia da posicao conferida.
@@ -36,37 +32,29 @@ class Cauda:
 
 
 def _delta_em_frames(ctx: _Ctx) -> int | None:
-    """Deslocamento do ultimo frame coberto do ultimo plano antigo, em frames."""
-    for evento in sorted(ctx.old.events, key=lambda ev: ev.record_in, reverse=True):
-        if not _tem_tc(evento):
-            continue
-        tc = _maior_tc_coberto(ctx, evento)
-        if tc is None:
-            continue
-        frame = evento.record_in + (tc - evento.source_in)
-        novo = _destino_do_frame(ctx, evento, frame)
-        if novo is None:
-            continue
-        return novo - frame
-    return None
+    """Deslocamento do ultimo frame coberto do ultimo plano antigo, em frames.
+
+    A cauda segue a ultima peca do verify, como o mapa de tempo segue a
+    ultima peca casada: e o deslocamento dela que leva o material depois do
+    ultimo evento antigo para o corte novo.
+    """
+    return ctx.pecas.delta_da_ultima
 
 
 def _espaco_livre(ctx: _Ctx, inicio: int) -> int | None:
     """Espaco livre do corte novo a partir do frame informado, em frames.
 
     O espaco livre e o que sobra depois do material que o corte novo casa com o
-    corte antigo: None quando nenhum plano casado comeca depois do frame (a
-    cauda pode ocupar o resto do corte novo) e zero quando um plano ja cobre
-    esse frame (a cauda nao cabe).
+    corte antigo: None quando nenhuma peca comeca depois do frame (a cauda
+    pode ocupar o resto do corte novo) e zero quando uma peca ja cobre esse
+    frame (a cauda nao cabe).
     """
     livre: int | None = None
-    for _antigo, novo, tc_in, tc_fim in _interseccoes(ctx):
-        comeco = novo.record_in + (tc_in - novo.source_in)
-        fim = novo.record_in + (tc_fim - novo.source_in)
-        if comeco <= inicio < fim:
+    for peca in ctx.pecas.pecas:
+        if peca.new_in <= inicio < peca.new_out:
             return 0
-        if comeco > inicio and (livre is None or comeco - inicio < livre):
-            livre = comeco - inicio
+        if peca.new_in > inicio and (livre is None or peca.new_in - inicio < livre):
+            livre = peca.new_in - inicio
     return livre
 
 

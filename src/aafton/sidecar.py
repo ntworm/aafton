@@ -10,11 +10,19 @@ AAF desalinhado em uma hora sem ninguem perceber.
 from __future__ import annotations
 
 import json
+import math
 import re
 from dataclasses import dataclass
+from fractions import Fraction
 from pathlib import Path
 
-from .timecode import TimecodeRate, label_to_samples, samples_to_label
+from .timecode import (
+    TimecodeRate,
+    frames_to_samples_exact,
+    label_to_frames,
+    label_to_samples,
+    samples_to_label,
+)
 
 SIDECAR_SUFFIX = ".aafton.json"
 # Versao que este codigo grava. A 3 marca a forma medida do crossfade no Live
@@ -161,8 +169,49 @@ def sidecar_missing(als_path: str | Path) -> SidecarMissingError:
     )
 
 
-def parse_anchor_locator_name(name: str, rate: TimecodeRate) -> int | None:
-    """Le a posicao absoluta a partir do nome do locator de ancoragem."""
+def frames_per_day(rate: TimecodeRate) -> int:
+    """Quantos frames de rotulo tem um dia de timecode na taxa dada.
+
+    Um dia sao 24 h de frames de rotulo, nao 24 h de samples: o ultimo frame
+    do dia e o do rotulo `23:59:59:FF` e o dia inteiro tem mais um frame. A
+    conta passa pelo proprio rotulo para nao reimplementar o drop frame.
+    """
+    ultimo = rate.nominal_fps - 1
+    return label_to_frames(f"23:59:59:{ultimo:02d}", rate) + 1
+
+
+def preroll_frames(rate: TimecodeRate) -> int:
+    """A janela do leitor em frames: o pre-roll de dez segundos, para cima."""
+    # O pipeline importa o sidecar: a constante entra aqui, na hora, para nao
+    # fechar o ciclo de importacao.
+    from .pipeline import PRE_ROLL_SEGUNDOS
+
+    return math.ceil(PRE_ROLL_SEGUNDOS * rate.fps)
+
+
+def na_janela_preroll(frame_negativo: int, rate: TimecodeRate) -> bool:
+    """Verdadeiro quando o deslocamento negativo cabe na janela de volta 24 h."""
+    return -preroll_frames(rate) <= frame_negativo < 0
+
+
+def anchor_label_samples(label: str, rate: TimecodeRate, sample_rate: int) -> int | Fraction:
+    """Posicao em samples do rotulo do locator, desembrulhando 24 h na pre-roll."""
+    frame = label_to_frames(label, rate)
+    dia = frames_per_day(rate)
+    if na_janela_preroll(frame - dia, rate):
+        posicao = frames_to_samples_exact(frame - dia, rate, sample_rate)
+    else:
+        posicao = label_to_samples(label, rate, sample_rate)
+    return int(posicao) if posicao.denominator == 1 else posicao
+
+
+def parse_anchor_locator_name(name: str, rate: TimecodeRate) -> int | Fraction | None:
+    """Le a posicao absoluta a partir do nome do locator de ancoragem.
+
+    Um locator escrito com a origem embrulhada em 24 h (a pre-roll negativa
+    antes do primeiro clip) volta para a origem negativa. A volta e contada em
+    frames de rotulo: 24 h de samples nao sao 24 h de timecode.
+    """
     match = _ANCHOR_NAME_RE.match(name.strip())
     if match is None:
         return None
@@ -170,7 +219,9 @@ def parse_anchor_locator_name(name: str, rate: TimecodeRate) -> int | None:
     tail = re.search(r"@\s*(\d+)", name)
     if tail:
         sample_rate = int(tail.group(1))
-    return int(label_to_samples(match.group(1), rate, sample_rate))
+    posicao = anchor_label_samples(match.group(1), rate, sample_rate)
+    # Fora da janela a posicao fica como sempre foi lida (int).
+    return int(posicao) if posicao >= 0 else posicao
 
 
 def read_anchor(als_path: str | Path) -> Anchor:

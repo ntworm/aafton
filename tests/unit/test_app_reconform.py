@@ -9,8 +9,9 @@ import pytest
 from aafton.studio import app_convert, app_reconform
 from aafton.studio.app_routes import POST_HANDLERS
 from aafton.studio.page import load_page
-from tests.unit.test_cli_reconform import _AMBIGUO, _edls
+from tests.unit.test_cli_reconform import _edls, _edls_empate
 from tests.unit.test_reconform_apply import _build_spanning_set, _sha256
+from tests.unit.test_review_robustness import make_set
 
 pytest.importorskip("opentimelineio")
 
@@ -26,6 +27,14 @@ def test_pagina_tem_a_aba() -> None:
     assert 'data-direction="reconform"' in html
     assert 'id="tpl-track-reconform"' in html
     assert "App.renderReconform" in html
+
+
+def test_pagina_avisa_do_empate_em_vez_de_recusar() -> None:
+    """A aba do Reconform avisa dos planos repetidos em vez de recusar o set."""
+    html = load_page()
+    aviso = "Some shots are used more than once; those parts were not matched and are listed."
+    assert "A shot is used twice: the set cannot be conformed." not in html
+    assert aviso in html
 
 
 def test_read_devolve_a_change_list(tmp_path: Path) -> None:
@@ -73,13 +82,24 @@ def test_run_so_locators(tmp_path: Path) -> None:
     assert (tmp_path / "review reconform locators.als").exists()
 
 
-def test_run_ambiguo_nao_escreve(tmp_path: Path) -> None:
-    old, new = _edls(tmp_path, _AMBIGUO)
-    conjunto = _build_spanning_set(tmp_path)
+def test_run_empate_escreve_e_avisa(tmp_path: Path) -> None:
+    """O par empatado e aplicado e o trecho sem correspondencia fica como aviso."""
+    old, new = _edls_empate(tmp_path)
+    conjunto = make_set(tmp_path)
     res = app_reconform.run({"input": old, "new_cut": new, "set": str(conjunto)})
-    assert not res["written"]
-    assert res["verdict"]["state"] == "err"
-    assert not (tmp_path / "review reconform.als").exists()
+    assert res["ok"] and res["written"]
+    assert res["verdict"]["word"] == "Conformed"
+    assert (tmp_path / "review reconform.als").exists()
+    notas = res["notes"]["main"]
+    avisos = [nota for nota in notas if nota["code"] == "RECONFORM_REUSE_UNRESOLVED"]
+    assert avisos
+    assert avisos[0]["sev"] == "warning"
+
+    leitura = app_reconform.read({"input": old, "new_cut": new, "edl_rate": "25"})
+    assert leitura["unresolved"] == 1
+    linhas = [linha for linha in leitura["items"] if linha["kind"] == "Not matched"]
+    assert linhas
+    assert linhas[0]["state"]["st"] == "warn"
 
 
 def test_run_sem_set(tmp_path: Path) -> None:

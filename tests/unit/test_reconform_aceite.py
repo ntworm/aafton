@@ -337,8 +337,8 @@ def test_rotulo_de_drop_frame_no_relatorio_da_reconformacao(tmp_path: Path):
     assert f"old {frames_to_label(86496, RATE_24)} -> " in linha24
 
 
-def test_reuso_do_mesmo_plano_no_corte_novo_marca_ambiguidade(tmp_path: Path):
-    """O mesmo plano usado duas vezes no corte novo deixa a mudanca ambigua."""
+def test_reuso_do_mesmo_plano_no_corte_novo_e_resolvido_pela_ordem(tmp_path: Path):
+    """O mesmo plano usado duas vezes no corte novo e resolvido pela ordem dos planos."""
     velho = [_clip("R001", 172800, 86400, 48)]
     novo = [_clip("R001", 172800, 86400, 48), _clip("R001", 172800, 86448, 48)]
 
@@ -347,9 +347,9 @@ def test_reuso_do_mesmo_plano_no_corte_novo_marca_ambiguidade(tmp_path: Path):
 
     for formato in ("edl", "xml", "aaf"):
         cl = _diff(velhos[formato], novos[formato], RATE_24)
-        assert cl.ambiguous is True
-        assert cl.time_map is None
-        assert cl.counts == {"ambiguous": 2}
+        assert cl.ambiguous is False
+        assert cl.time_map is not None
+        assert cl.counts == {"insert": 1}
 
 
 def test_plano_dividido_por_cutaway_nao_e_ambiguo(tmp_path: Path):

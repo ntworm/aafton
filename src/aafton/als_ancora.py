@@ -24,7 +24,7 @@ from .als_read_clips import _media_path
 from .als_render import e_video
 from .ltc import RATES_LTC
 from .report import Report
-from .sidecar import Anchor, anchor_locator_label, sidecar_missing
+from .sidecar import Anchor, anchor_label_samples, anchor_locator_label, sidecar_missing
 from .timecode import TimecodeRate, label_to_samples
 
 INICIO_PADRAO = "01:00:00:00"
@@ -158,7 +158,7 @@ def _escolher_rotulo(
             {"locator": nome},
         )
         return rotulo
-    if label_to_samples(rotulo, rate, taxa) != label_to_samples(start.start_tc, rate, taxa):
+    if anchor_label_samples(rotulo, rate, taxa) != label_to_samples(start.start_tc, rate, taxa):
         report.warning(
             "ALS_START_TC_OVERRIDES_LOCATOR",
             f"the start {start.start_tc} given replaces the locator {nome!r} of the set",
@@ -182,7 +182,11 @@ def ancora_sem_sidecar(
         start = start_padrao()
     taxa = taxa_da_maioria(root, path)
     rotulo = _escolher_rotulo(report, start, locator, taxa)
-    inicio = round(label_to_samples(rotulo, start.timecode_rate, taxa))
+    if locator is not None and start.assumed:
+        amostras = anchor_label_samples(rotulo, start.timecode_rate, taxa)
+    else:
+        amostras = label_to_samples(rotulo, start.timecode_rate, taxa)
+    inicio = round(amostras)
     return Anchor(
         live_origin_samples=inicio,
         session_start_samples=inicio,

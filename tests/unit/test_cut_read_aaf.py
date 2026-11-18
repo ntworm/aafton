@@ -214,7 +214,8 @@ def test_taxa_nao_suportada_reporta_erro(tmp_path: Path):
     assert "RECONFORM_RATE_UNSUPPORTED" in _codigos(report)
 
 
-def test_timewarp_reporta_erro(tmp_path: Path):
+def test_timewarp_sem_parametro_vira_plano_inteiro(tmp_path: Path):
+    """Sem parametro de velocidade, o plano so pode ser movido inteiro."""
     caminho = tmp_path / "timewarp.aaf"
     with aaf2.open(str(caminho), "w") as f:
         comp = _nova_comp(f, "TW")
@@ -233,8 +234,13 @@ def test_timewarp_reporta_erro(tmp_path: Path):
         slot.name, slot.segment = "V1", f.create.Sequence(media_kind="picture")
         slot.segment.components.append(og)
     report = Report(strict=False)
-    assert read_cut_aaf(caminho, report) is None
-    assert "RECONFORM_TIMEWARP" in _codigos(report)
+    corte = read_cut_aaf(caminho, report)
+    assert corte is not None
+    assert "RECONFORM_TIMEWARP" not in _codigos(report)
+    evento = corte.events[0]
+    assert evento.kind == "clip" and evento.reel == "R001"
+    assert evento.whole_only is True
+    assert evento.speed is None
 
 
 def test_unwrap_operation_group_selector_e_sequence_aninhada(tmp_path: Path):

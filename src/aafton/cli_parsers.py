@@ -161,6 +161,20 @@ def add_inspect_parser(sub: argparse._SubParsersAction, func, edl_taxa, rates_lt
     p_inspect.add_argument(
         "--audio-dir", default=None, help="extra folder to look for the media of the AAF"
     )
+    p_inspect.add_argument(
+        "--json", action="store_true", help="prints JSON, which the inspect always does"
+    )
+    p_inspect.add_argument(
+        "--resolve-media",
+        action="store_true",
+        help="AAF: finds the linked media and says per media where it is and its format",
+    )
+    p_inspect.add_argument(
+        "--extract-dir",
+        default=None,
+        metavar="FOLDER",
+        help="with --resolve-media, folder where the embedded media is extracted",
+    )
     add_organize_inspect_args(p_inspect)
     p_inspect.set_defaults(func=func)
 

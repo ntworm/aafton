@@ -26,6 +26,7 @@ from .aaf_write_preflight import (
     _validate_session_overlaps as _validate_session_overlaps,
 )
 from .aaf_write_defs import (
+    DEFAULT_COMPOSITION_NAME,
     AafBuilder,
     _AAF_INT16_TYPE_AUID as _AAF_INT16_TYPE_AUID,
     _AUDIO_CHANNEL_COMBINER_AUID as _AUDIO_CHANNEL_COMBINER_AUID,
@@ -370,7 +371,13 @@ def _confirmar_exportacao_embed(
 
 
 def _write_aaf_embed(
-    session: SessionIR, destination: Path, report: Report, rate, consumed_in, consumed_out
+    session: SessionIR,
+    destination: Path,
+    report: Report,
+    rate,
+    consumed_in,
+    consumed_out,
+    composition_name: str = DEFAULT_COMPOSITION_NAME,
 ) -> None:
     """Grava o AAF com a midia embarcada na essencia dos SourceMobs de arquivo."""
     if not preflight_embed(session, report):
@@ -386,7 +393,7 @@ def _write_aaf_embed(
         staging = _criar_staging(destination)
         try:
             with aaf2.open(str(staging), "w") as f:
-                comp = f.create.CompositionMob("Exported from Ableton")
+                comp = f.create.CompositionMob(composition_name)
                 f.content.mobs.append(comp)
 
                 builder = AafBuilder(f, report, session, _curva_suportada)
@@ -412,7 +419,13 @@ def _write_aaf_embed(
 
 
 def _write_aaf_link(
-    session: SessionIR, destination: Path, report: Report, rate, consumed_in, consumed_out
+    session: SessionIR,
+    destination: Path,
+    report: Report,
+    rate,
+    consumed_in,
+    consumed_out,
+    composition_name: str = DEFAULT_COMPOSITION_NAME,
 ) -> None:
     """Grava o AAF referenciando os arquivos externos, como sempre foi."""
     mono_sources = _split_stereo_sources(session, destination, report)
@@ -422,7 +435,7 @@ def _write_aaf_link(
     try:
         with aaf2.open(str(staging), "w") as f:
             # A composition que representa a timeline
-            comp = f.create.CompositionMob("Exported from Ableton")
+            comp = f.create.CompositionMob(composition_name)
             f.content.mobs.append(comp)
 
             builder = AafBuilder(f, report, session, _curva_suportada)
@@ -450,11 +463,14 @@ def write_aaf(
     report: Report | None = None,
     *,
     media: str = "link",
+    composition_name: str | None = None,
 ) -> None:
     """Grava o SessionIR em um AAF valido com TimecodeMobSlot.
 
     ``media`` escolhe como a midia entra no AAF: ``link`` referencia os
     arquivos externos e ``embed`` grava a essencia dentro do proprio AAF.
+    ``composition_name`` e o nome da CompositionMob; sem ele, o export do
+    Live grava ``Exported from Ableton``.
     """
     if report is None:
         report = Report(strict=False)
@@ -476,7 +492,8 @@ def write_aaf(
         return
 
     destination = Path(destination)
+    nome = composition_name or DEFAULT_COMPOSITION_NAME
     if media == "embed":
-        _write_aaf_embed(session, destination, report, rate, consumed_in, consumed_out)
+        _write_aaf_embed(session, destination, report, rate, consumed_in, consumed_out, nome)
     else:
-        _write_aaf_link(session, destination, report, rate, consumed_in, consumed_out)
+        _write_aaf_link(session, destination, report, rate, consumed_in, consumed_out, nome)

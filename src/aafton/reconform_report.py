@@ -42,7 +42,6 @@ def _clean_text(text: str) -> str:
 
 def _format_change_line(change: Change, rate: TimecodeRate) -> str:
     """Formata uma entrada de mudanca em uma unica linha de texto."""
-    prefix = "[AMBIGUOUS] " if change.kind == "ambiguous" else ""
     old_in = _tc_label(change.old_in, rate, "-")
     old_out = _tc_label(change.old_out, rate, "-")
     new_in = _tc_label(change.new_in, rate, "-")
@@ -50,7 +49,7 @@ def _format_change_line(change: Change, rate: TimecodeRate) -> str:
     delta = "-" if change.delta_frames is None else f"{change.delta_frames:+d}"
     source = _clean_text(change.source) if change.source else "-"
     line = (
-        f"{prefix}{change.kind} | old {old_in} -> {old_out} | "
+        f"{change.kind} | old {old_in} -> {old_out} | "
         f"new {new_in} -> {new_out} | delta {delta} | source {source}"
     )
     detail = _clean_text(change.detail) if change.detail else ""
@@ -78,8 +77,6 @@ def change_list_text(cl: ChangeList) -> str:
     sequencia = _sequencia(cl)
     if sequencia:
         lines.append(sequencia)
-    if cl.ambiguous:
-        lines.append("Status: AMBIGUOUS")
     if cl.changes:
         lines.append("")
         lines.extend(_format_change_line(change, cl.rate) for change in cl.changes)

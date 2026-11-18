@@ -8,17 +8,24 @@ from fractions import Fraction
 from pathlib import Path
 
 from . import locators_write
-from .als_ancora import StartSpec, _locator_tc, ancora_sem_sidecar, start_da_linha
+from .als_ancora import (
+    StartSpec,
+    _locator_tc,
+    ancora_sem_sidecar,
+    start_da_linha,
+    taxa_da_maioria,
+)
 from .ir import PRODUCTION_LAYOUT
 from .report import Report
 from .sidecar import (
     Anchor,
     SidecarMissingError,
+    anchor_label_samples,
     anchor_locator_label,
     read_anchor,
     sidecar_path_for,
 )
-from .timecode import TimecodeRate
+from .timecode import TimecodeRate, samples_to_label
 
 
 def _rate_tuple(rate: TimecodeRate) -> tuple[int, int, bool]:
@@ -52,6 +59,41 @@ def _anchor_from_sidecar(set_p: Path, report: Report, cut_rate: TimecodeRate) ->
     return anchor
 
 
+def _start_from_locator(
+    set_p: Path,
+    root: ET.Element,
+    report: Report,
+    cut_rate: TimecodeRate,
+) -> StartSpec | None:
+    """Monta o StartSpec a partir do locator TC, desembrulhando a pre-roll."""
+    locator = _locator_tc(root)
+    rotulo = anchor_locator_label(locator[0]) if locator is not None else None
+    if locator is None or rotulo is None:
+        report.error(
+            "RECONFORM_ANCHOR_MISSING",
+            "set has no sidecar, no TC anchor locator, and no start_tc",
+            {"path": str(set_p)},
+        )
+        return None
+    taxa = taxa_da_maioria(root, set_p)
+    try:
+        amostras = anchor_label_samples(rotulo, cut_rate, taxa)
+    except ValueError as exc:
+        report.error(
+            "RECONFORM_ANCHOR_MISSING",
+            f"invalid TC anchor locator {locator[0]!r}: {exc}",
+            {"path": str(set_p), "locator": locator[0]},
+        )
+        return None
+    tc_inicio = samples_to_label(amostras, cut_rate, taxa) if amostras < 0 else rotulo
+    return StartSpec(
+        start_tc=tc_inicio,
+        frame_rate=Fraction(cut_rate.num, cut_rate.den),
+        drop_frame=cut_rate.drop_frame,
+        assumed=True,
+    )
+
+
 def _start_without_sidecar(
     set_p: Path,
     root: ET.Element,
@@ -69,28 +111,7 @@ def _start_without_sidecar(
             )
             return None
         return start_da_linha(start_tc, cut_rate)
-    locator = _locator_tc(root)
-    if locator is None:
-        report.error(
-            "RECONFORM_ANCHOR_MISSING",
-            "set has no sidecar, no TC anchor locator, and no start_tc",
-            {"path": str(set_p)},
-        )
-        return None
-    rotulo = anchor_locator_label(locator[0])
-    if rotulo is None:
-        report.error(
-            "RECONFORM_ANCHOR_MISSING",
-            "set has no sidecar, no TC anchor locator, and no start_tc",
-            {"path": str(set_p)},
-        )
-        return None
-    return StartSpec(
-        start_tc=rotulo,
-        frame_rate=Fraction(cut_rate.num, cut_rate.den),
-        drop_frame=cut_rate.drop_frame,
-        assumed=True,
-    )
+    return _start_from_locator(set_p, root, report, cut_rate)
 
 
 def _anchor_without_sidecar(

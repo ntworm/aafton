@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from fractions import Fraction
+
 import pytest
 
 from aafton.cut_ir import CutEvent, CutIR
@@ -22,9 +24,13 @@ def _clip(
     src_out: int,
     reel: str | None = None,
     trans: int = 0,
+    speed: Fraction | None = Fraction(1),
+    whole: bool = False,
 ) -> CutEvent:
     """Cria um CutEvent de clip em frames para testes."""
-    return CutEvent(idx, "clip", source, reel, src_in, src_out, rec_in, rec_out, None, trans)
+    return CutEvent(
+        idx, "clip", source, reel, src_in, src_out, rec_in, rec_out, None, trans, speed, whole
+    )
 
 
 def _gap(idx: int, rec_in: int, rec_out: int) -> CutEvent:
@@ -161,15 +167,15 @@ def test_shot_split_by_inserted_coverage_not_ambiguous() -> None:
     assert cl.time_map.map_frame(60) == 90
 
 
-def test_same_shot_used_twice_is_ambiguous() -> None:
-    """Mesmo trecho de origem reutilizado no corte novo marca ambiguidade e time_map None."""
+def test_same_shot_used_twice_is_resolved_by_order() -> None:
+    """Mesmo trecho de origem reutilizado no corte novo e resolvido pela ordem."""
     old = _cut([_clip(1, "A", 0, 100, 100, 200)])
     new = _cut([_clip(1, "A", 0, 100, 100, 200), _clip(2, "A", 100, 200, 100, 200)])
     cl = diff_cuts(old, new, Report())
     assert cl is not None
-    assert cl.ambiguous is True
-    assert cl.counts == {"ambiguous": 2}
-    assert cl.time_map is None
+    assert cl.ambiguous is False
+    assert cl.counts == {"insert": 1}
+    assert cl.time_map is not None
 
 
 def test_gap_kept_and_shrunk_overflow_to_saiu() -> None:

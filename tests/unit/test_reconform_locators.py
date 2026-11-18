@@ -13,12 +13,14 @@ from aafton.als_xml import get_value, load_als, renumber_siblings, save_als, set
 from aafton.cut_ir import CutEvent, CutIR
 from aafton.ir import PRODUCTION_LAYOUT
 from aafton.reconform_anchor import resolve_reconform_anchor
+from aafton.reconform_apply import apply_reconform
 from aafton.reconform_diff import Change, ChangeList, diff_cuts
 from aafton.reconform_locators import write_change_locators
 from aafton.reconform_report import change_list_text, write_change_list_csv
 from aafton.report import Report
 from aafton.sidecar import sidecar_path_for
 from aafton.timecode import TimecodeRate, label_to_samples
+from tests.unit.test_reconform_apply import _corte_empate
 from tests.unit.test_review_robustness import HOUR, make_set
 
 RATE_25 = TimecodeRate(25, 1)
@@ -172,21 +174,47 @@ def test_locators_written_exact_beats_and_source_preserved(tmp_path: Path) -> No
     assert not any(name.startswith("RC shift ") for name, _, _ in rc_entries)
 
 
-def test_ambiguous_flag_and_before_origin_skipped(tmp_path: Path) -> None:
-    """Marca mudancas ambiguas no texto e pula locator anterior a origem do set."""
-    old_cut = CutIR("old.edl", RATE_25, 90000, [_clip(1, "A", 90000, 90050, 100, 150)])
-    new_cut = CutIR(
-        "new.edl",
-        RATE_25,
-        90000,
-        [_clip(1, "A", 90000, 90050, 100, 150), _clip(2, "A", 90050, 90100, 100, 150)],
-    )
-    amb_cl = diff_cuts(old_cut, new_cut, Report())
-    assert amb_cl is not None
-    text = change_list_text(amb_cl)
-    assert "Status: AMBIGUOUS" in text
-    assert text.count("[AMBIGUOUS] ambiguous") == 2
+def test_empate_listado_e_sem_locator_na_copia(tmp_path: Path) -> None:
+    """O empate vira mudanca listada, sem status ambiguo e sem locator na copia."""
+    antigo, novo = _corte_empate()
+    report = Report()
+    emp_cl = diff_cuts(antigo, novo, report)
+    assert emp_cl is not None
+    assert emp_cl.ambiguous is False
+    assert any(iss.code == "RECONFORM_REUSE_UNRESOLVED" for iss in report.issues)
 
+    text = change_list_text(emp_cl)
+    assert "Status: AMBIGUOUS" not in text
+    assert "unresolved | old 01:00:02:00 -> 01:00:04:00" in text
+    assert "new 01:00:01:00 -> 01:00:05:00" in text
+
+    csv_path = write_change_list_csv(emp_cl, tmp_path / "empate.csv")
+    with csv_path.open("r", encoding="utf-8", newline="") as handle:
+        rows = list(csv.reader(handle))
+    assert any(row[0] == "unresolved" for row in rows[1:])
+
+    set_path = make_set(tmp_path)
+    res = apply_reconform(set_path, emp_cl, Report(strict=False))
+    assert res.written is True
+    out_root = load_als(res.output)
+    names = [
+        get_value(loc, "Name") for loc in out_root.findall(".//LiveSet/Locators/Locators/Locator")
+    ]
+    assert not any(name.startswith("RC unresolved") for name in names)
+
+    # O modo so de locators tambem nao escreve o trecho sem correspondencia.
+    loc_res = write_change_locators(set_path, emp_cl, Report(strict=False))
+    assert loc_res.written is True
+    loc_root = load_als(loc_res.output)
+    loc_names = [
+        get_value(loc, "Name") for loc in loc_root.findall(".//LiveSet/Locators/Locators/Locator")
+    ]
+    assert not any(name.startswith("RC unresolved") for name in loc_names)
+    assert "RC delete 01:00:01:00" in loc_names
+
+
+def test_locator_antes_da_origem_e_pulado(tmp_path: Path) -> None:
+    """Pula o locator anterior a origem do set."""
     set_path = make_set(tmp_path)
     early_cl = ChangeList(
         old_path="old.edl",
