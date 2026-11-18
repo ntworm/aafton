@@ -99,7 +99,7 @@ def test_export_preserves_static_gain_or_mute(tmp_path, muted):
     session.tracks[0].muted = muted
     path = tmp_path / "output.aaf"
     write_aaf(session, path, Report())
-    # Track muda vai como clip mudo com o ganho normal (decisao de Gabriel, 15/11/2026).
+    # Track muda vai como clip mudo com o ganho normal (decisao do projeto, 15/11/2026).
     relido = next(read_aaf(path, Report()).all_clips())
     assert relido.gain_linear == 0.125
     assert relido.muted is muted

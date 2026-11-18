@@ -93,7 +93,7 @@ def reportar_fades(track, consumed_in, consumed_out, pulados, report: Report) ->
     O fade que nao cabe no clip continua como envelope de ganho e e um erro,
     porque o AAF nao o representa. O fade que cabe no clip mas tem automacao
     dentro dele tambem vira envelope; o som fica igual, so o fade editavel se
-    perde, entao e um aviso (decisao de Gabriel de 16/11/2026).
+    perde, entao e um aviso (decisao do projeto de 16/11/2026).
     """
     for clip in track.clips:
         if id(clip) in pulados:

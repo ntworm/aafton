@@ -360,7 +360,7 @@ def _set_clip_color(node: ET.Element, clip: ClipIR) -> None:
 
 
 # Cor de clip do Live para take circled no som direto: indice da paleta do Live,
-# o verde, como no mock aprovado por Gabriel em 14/11/2026 (o ambar fica para a acao).
+# o verde, como no mock aprovado em 14/11/2026 (o ambar fica para a acao).
 CIRCLED_CLIP_COLOR = 5
 # Take nao circled: cinza medio da paleta (7B7B7B). A cor padrao do template e um
 # verde-menta (6) que nao se distingue do verde do circled; medido no Live em 14/11.

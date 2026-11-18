@@ -51,7 +51,7 @@ def _ganho_base(track, clip) -> float:
 def clip_mudo(track, clip) -> bool:
     """Track muda ou clip desativado: o clip vai ao AAF mudo, com o ganho normal.
 
-    Decisao de Gabriel (15/11/2026): o editor desmuta o clip no Pro Tools em vez
+    Decisao do projeto (15/11/2026): o editor desmuta o clip no Pro Tools em vez
     de subir um ganho que veio -inf.
     """
     return bool(track.muted or clip.muted)

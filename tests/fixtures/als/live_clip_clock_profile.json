@@ -1,5 +1,5 @@
 {
-  "provenance": "Gabriel saved generated sets using Save Live Set As on 2026-10-14. Text values are extracted unchanged from those files; no audio is included. Playback ceil at60BPM is observed in the separate diagnostic WAVs;97BPM evidence covers SaveAs normalization only.",
+  "provenance": "The author saved generated sets using Save Live Set As on 2026-10-14. Text values are extracted unchanged from those files; no audio is included. Playback ceil at60BPM is observed in the separate diagnostic WAVs;97BPM evidence covers SaveAs normalization only.",
   "sample_rate": 48000,
   "inferred_ticks_per_beat": 3843840,
   "evidence": [

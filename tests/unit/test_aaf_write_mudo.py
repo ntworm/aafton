@@ -1,6 +1,6 @@
 """Track muda e clip desativado do Live vao ao AAF como clip mudo do Avid.
 
-Decisao de Gabriel (15/11/2026): o clip leva o ganho normal e fica mudo num
+Decisao do projeto (15/11/2026): o clip leva o ganho normal e fica mudo num
 Selector cujo Selected e um Filler, em vez de um ganho -inf que o editor teria
 de subir na mao.
 """
